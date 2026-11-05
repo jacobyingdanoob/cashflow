@@ -1,0 +1,587 @@
+.asset-cash-flow {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid #dce5d4;
+  border-radius: 8px;
+  background: #f5f7ef;
+  color: #456342;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.asset-cash-flow dl {
+  margin: 0;
+}
+.asset-cash-flow dl > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 4px 0;
+}
+.asset-cash-flow dd {
+  margin: 0 0 0 auto;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.asset-cash-flow-total {
+  border-top: 1px solid #dce5d4;
+}
+.asset-cash-flow p,
+.portfolio-item .asset-cash-flow p {
+  margin: 8px 0 0;
+  color: #456342;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.asset-cash-flow .negative {
+  color: #943e30 !important;
+}
+.asset-cash-flow-details {
+  margin-top: 10px;
+}
+.asset-cash-flow-details > summary {
+  color: #456342;
+  cursor: pointer;
+  font-size: 11px;
+}
+.economy-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #dce5d4;
+  border-radius: 10px;
+  background: #eef3e7;
+  padding: 13px 17px;
+  margin: 0 0 25px;
+  color: #456342;
+}
+.economy-banner > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 15px;
+  align-items: center;
+}
+.economy-banner strong {
+  font-size: 12px;
+}
+.economy-banner span {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.economy-banner button {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.notification-stack {
+  position: fixed;
+  z-index: 35;
+  right: 22px;
+  bottom: 22px;
+  width: 350px;
+  max-width: calc(100vw - 28px);
+  max-height: 65dvh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 3px;
+  pointer-events: none;
+}
+.notification-stack > * {
+  pointer-events: auto;
+}
+.notification-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #cbdcc8;
+  border-radius: 9px;
+  background: #fffff8;
+  color: #315e46;
+  box-shadow: 0 3px 16px #183b2b12;
+  font-size: 11px;
+}
+.notification-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.notification-controls input {
+  accent-color: #24675b;
+}
+.notification-controls button {
+  background: none;
+  border: 0;
+  color: #315e46;
+  text-decoration: underline;
+  padding: 4px;
+}
+.notification-empty {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #fffff8;
+  color: #315e46;
+  font-size: 11px;
+}
+.notification-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.game-notification {
+  position: relative;
+  background: #fffff8;
+  border: 1px solid #cbdcc8;
+  border-left: 4px solid #357768;
+  border-radius: 12px;
+  box-shadow: 0 8px 35px #183b2b29;
+  flex-shrink: 0;
+  animation: notification-arrive 0.22s ease-out;
+}
+.notification-expand {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 15px 43px 15px 16px;
+  color: #315e46;
+  border-radius: 10px;
+}
+.notification-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: #526c4b;
+  margin-bottom: 9px;
+}
+.notification-meta > svg:last-child {
+  margin-left: auto;
+}
+.notification-expand > strong {
+  font-size: 13px;
+  line-height: 1.6;
+  display: block;
+}
+.notification-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.75;
+  color: #526b4b;
+  margin: 5px 0;
+}
+.notification-expand > small {
+  display: block;
+  font-size: 9px;
+  color: #5a714f;
+  margin-top: 8px;
+}
+.notification-dismiss {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+}
+.game-notification.negative,
+.game-notification.risk {
+  border-color: #d7a79e;
+  border-left-color: #a84536;
+  background: #fff5ef;
+}
+.game-notification.risk .notification-expand > strong,
+.game-notification.negative .notification-expand > strong {
+  color: #913e30;
+}
+.game-notification.cycle {
+  border-left-width: 5px;
+  animation: economic-flip 0.45s ease-out;
+}
+.game-notification.positive {
+  border-left-color: #6f8a3e;
+  background: #f7faed;
+}
+.older-notifications {
+  background: #f9fcf4;
+  border: 1px solid #d6e1cd;
+  border-radius: 9px;
+  padding: 9px 13px;
+  font-size: 11px;
+  color: #4b6841;
+}
+.older-notifications summary {
+  cursor: pointer;
+}
+.older-notifications button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid #dce5d4;
+  background: none;
+  color: #45643d;
+  padding: 10px 0;
+  font-size: 11px;
+}
+.event-details.risk .modal-header h2,
+.event-details.negative .modal-header h2 {
+  color: #963f31;
+}
+.event-details.cycle {
+  border-top: 5px solid #6d8950;
+}
+.cycle-reference {
+  background: #edf3e5;
+  border-radius: 9px;
+  padding: 15px;
+  margin: 15px 0;
+  font-size: 12px;
+  color: #455f3b;
+}
+.cycle-reference p {
+  line-height: 1.8;
+}
+.cycle-reference a {
+  color: #315d47;
+  font-size: 11px;
+  text-decoration: underline;
+}
+.liquidity-warning {
+  background: #fff1e9;
+  border: 1px solid #dba496;
+  border-left: 4px solid #ae4835;
+  border-radius: 9px;
+  color: #823a2e;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.liquidity-warning strong {
+  font-size: 14px;
+}
+.liquidity-warning p {
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 8px 0 0;
+}
+.principal-budget {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px 14px;
+  padding: 15px;
+  background: #edf3e7;
+  border: 1px solid #dce6d1;
+  border-radius: 9px;
+  color: #48673e;
+  font-size: 12px;
+  margin-bottom: 19px;
+}
+.principal-budget small {
+  grid-column: 1/-1;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #586d48;
+}
+.repayment-card {
+  padding: 18px 0;
+  border-bottom: 1px solid #dce5d1;
+}
+.repayment-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+  color: #45673b;
+}
+.repayment-title h4 {
+  font-size: 13px;
+  margin: 0 0 7px;
+}
+.repayment-title small {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #5d734c;
+}
+.repayment-title > strong {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.repayment-controls {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 14px;
+}
+.repayment-controls > .form-field {
+  flex: 1;
+  max-width: 210px;
+  margin: 0;
+}
+.repayment-controls input {
+  width: 100%;
+}
+.repayment-controls .button {
+  margin: 0;
+}
+.repayment-controls > .text-button {
+  margin-bottom: 11px;
+  white-space: nowrap;
+}
+.repayment-preview {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #4a6940;
+  margin: 12px 0 0;
+}
+.economic-catalog > .muted {
+  font-size: 13px;
+  line-height: 1.9;
+}
+.card-source,
+.encyclopedia-catalog {
+  padding: 13px 15px;
+  margin: 15px 0;
+  border: 1px solid #d9e3cc;
+  border-radius: 9px;
+  background: #f7faee;
+  color: #48623e;
+  font-size: 12px;
+  line-height: 1.85;
+}
+.card-source summary,
+.encyclopedia-catalog summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.card-source p,
+.encyclopedia-catalog p {
+  line-height: 1.85;
+  font-size: 12px;
+}
+.card-source a,
+.encyclopedia-catalog a {
+  color: #315d47;
+  text-decoration: underline;
+}
+.adapted-deck {
+  border-top: 1px solid #d9e3cc;
+  padding: 14px 0;
+}
+.card-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.card-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+  text-align: left;
+  font-size: 11px;
+}
+.card-table-scroll caption {
+  text-align: left;
+  margin: 12px 0;
+  color: #526544;
+}
+.card-table-scroll th,
+.card-table-scroll td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #d9e3cc;
+  vertical-align: top;
+}
+.card-table-scroll th {
+  font-weight: 600;
+}
+.economic-rule-grid,
+.economic-event-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 23px 0;
+}
+.economic-rule-grid > article,
+.economic-card {
+  border: 1px solid #d9e3cc;
+  border-radius: 12px;
+  background: #f7faee;
+  padding: 22px;
+}
+.economic-rule-grid h3 {
+  font-size: 16px;
+  color: #3e6139;
+  margin: 0 0 12px;
+}
+.economic-rule-grid p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #526b44;
+}
+.economic-rule-grid strong {
+  font-size: 12px;
+  color: #3f6237;
+  line-height: 1.8;
+}
+.cycle-timing {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #536d45;
+  border-left: 3px solid #a6b98c;
+  padding: 8px 16px;
+}
+.economic-catalog > section > h3 {
+  font-size: 20px;
+  color: #41643a;
+  margin: 28px 0 10px;
+}
+.economic-catalog h3 > small {
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 10px;
+}
+.economic-card {
+  background: #fffff9;
+}
+.economic-card.negative {
+  border-top: 3px solid #b87664;
+}
+.economic-card.positive {
+  border-top: 3px solid #7a9954;
+}
+.economic-card h4 {
+  font-size: 16px;
+  color: #41643a;
+  margin: 11px 0;
+}
+.economic-card p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #506b43;
+}
+.economic-card dt {
+  font-size: 10px;
+  font-weight: 650;
+  color: #42613a;
+  margin: 16px 0 7px;
+}
+.economic-card dd {
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 0;
+  color: #536d46;
+}
+.economic-card a {
+  display: inline-block;
+  margin-top: 17px;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #365e43;
+  text-decoration: underline;
+}
+.economic-card .eyebrow {
+  color: #526e42;
+}
+.liquidity-decision p {
+  font-size: 12px;
+  line-height: 1.9;
+}
+.liquidity-decision.warned {
+  border-top: 4px solid #a64e3d;
+}
+.liquidity-decision.warned h3 {
+  color: #943e30;
+}
+.liquidity-decision .market-asset {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.liquidity-decision .market-asset small {
+  display: block;
+  line-height: 1.8;
+  margin-top: 6px;
+}
+.event-details .event-wait-note {
+  line-height: 1.8;
+}
+.game-notification button:focus-visible {
+  outline: 3px solid #bd802f;
+  outline-offset: -3px;
+}
+@keyframes notification-arrive {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes economic-flip {
+  from {
+    transform: perspective(700px) rotateY(-55deg);
+    opacity: 0;
+  }
+  to {
+    transform: perspective(700px) rotateY(0);
+    opacity: 1;
+  }
+}
+@media (max-width: 800px) {
+  .economic-rule-grid,
+  .economic-event-grid {
+    grid-template-columns: 1fr;
+  }
+  .economy-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .notification-stack {
+    right: 12px;
+    bottom: 12px;
+    max-height: 52dvh;
+    width: 330px;
+  }
+  .notification-expand {
+    padding: 12px 40px 12px 13px;
+  }
+  .notification-preview {
+    -webkit-line-clamp: 1;
+  }
+  .repayment-controls {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .repayment-controls > .form-field {
+    min-width: 120px;
+  }
+  .repayment-title {
+    align-items: flex-start;
+  }
+  .economic-rule-grid > article,
+  .economic-card {
+    padding: 18px;
+  }
+  .principal-budget {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-notification,
+  .game-notification.cycle {
+    animation: none;
+  }
+}
+html[data-motion="reduced"] .game-notification {
+  animation: none;
+}

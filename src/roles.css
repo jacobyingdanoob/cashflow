@@ -1,0 +1,257 @@
+.role-preview {
+  margin: 20px 0 26px;
+}
+.setup-feature p {
+  color: #526448;
+}
+.role-preview > strong {
+  font-size: 14px;
+}
+.role-preview > p {
+  margin: 6px 0 12px;
+}
+.role-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.role-preview-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 10px;
+  background: #f4f2e9;
+  border: 1px solid #dddccf;
+  border-top: 3px solid;
+  border-radius: 8px;
+}
+.role-preview-grid strong {
+  font-size: 12px;
+}
+.role-preview-grid span {
+  font-size: 11px;
+  color: #245e50;
+}
+.role-preview-grid small {
+  font-size: 10px;
+  color: #5c6459;
+  line-height: 1.5;
+}
+.role-modal {
+  max-width: 660px;
+}
+.role-reveal {
+  --role-accent: #245e50;
+}
+.role-hero {
+  position: relative;
+  text-align: center;
+  padding: 20px 18px 24px;
+  color: white;
+  background: var(--role-accent);
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 14px;
+}
+.role-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.16;
+}
+.motif-grid .role-hero::before {
+  background-image:
+    linear-gradient(white 1px, transparent 1px),
+    linear-gradient(90deg, white 1px, transparent 1px);
+  background-size: 27px 27px;
+  transform: rotate(-12deg) scale(1.4);
+}
+.motif-rings .role-hero::before {
+  background: repeating-radial-gradient(
+    circle at 50% 54%,
+    transparent 0 24px,
+    white 25px 26px,
+    transparent 27px 48px
+  );
+}
+.motif-rays .role-hero::before {
+  background: repeating-conic-gradient(
+    from 15deg at 50% 54%,
+    transparent 0deg 17deg,
+    white 18deg 19deg,
+    transparent 20deg 37deg
+  );
+}
+.role-difficulty {
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.role-emblem {
+  display: grid;
+  place-items: center;
+  width: 94px;
+  height: 94px;
+  margin: 15px auto;
+  background: #ffffff18;
+  border: 1px solid #ffffff70;
+  border-radius: 24px;
+}
+.role-hero h3 {
+  font-size: 29px;
+  letter-spacing: -0.7px;
+  margin: 6px 0;
+  color: white;
+}
+.role-hero p {
+  margin: 8px auto 0;
+  max-width: 380px;
+  font-size: 13px;
+  color: white;
+}
+.role-traits {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 16px 0;
+}
+.role-traits span {
+  border: 1px solid #d9ddcf;
+  background: #f3f2e9;
+  padding: 6px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+}
+.role-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 13px;
+  padding: 16px;
+  background: #f2f1e8;
+  border-radius: 12px;
+}
+.role-stats dt {
+  font-size: 11px;
+  color: #566354;
+}
+.role-stats dd {
+  margin: 5px 0 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: #254e43;
+}
+.role-debt-story {
+  padding: 5px 0 12px;
+}
+.role-debt-story strong,
+.role-advice strong {
+  font-size: 13px;
+}
+.role-debt-story p,
+.role-advice p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 7px 0;
+}
+.role-debt-story small {
+  color: #5a6257;
+  font-size: 10px;
+  line-height: 1.5;
+  display: block;
+}
+.role-advice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+.role-advice > div {
+  padding: 13px;
+  border-radius: 9px;
+  background: #eaf0e5;
+}
+.role-advice > div:last-child {
+  background: #f6e8df;
+}
+.role-advice svg {
+  vertical-align: middle;
+  margin-right: 7px;
+}
+.dream-map-key {
+  margin: 12px 6px 0;
+  padding: 10px 13px;
+  color: #62481f;
+  border: 1px solid #d8bc79;
+  border-radius: 9px;
+  background: #fcf4dc;
+  font-size: 12px;
+}
+.dream-map-key summary {
+  cursor: pointer;
+}
+.dream-map-key summary > span:last-child {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.dream-map-key ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.dream-map-key li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.dream-map-key li span {
+  font-size: 10px;
+}
+.notification-stack.has-pile {
+  padding-top: 8px;
+}
+.has-pile .older-notifications {
+  position: relative;
+  border: 1px solid #d3d9c9;
+  box-shadow:
+    0 -4px 0 -1px #e3e7da,
+    0 -8px 0 -2px #cdd7c4;
+}
+.older-notifications summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.older-notifications summary > span {
+  margin-left: auto;
+  font-size: 10px;
+}
+.older-notifications[open] {
+  max-height: 32dvh;
+  overflow-y: auto;
+}
+@media (max-width: 800px) {
+  .role-preview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .role-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .role-stats dd {
+    font-size: 19px;
+  }
+  .role-hero h3 {
+    font-size: 25px;
+  }
+  .role-advice {
+    grid-template-columns: 1fr;
+  }
+  .dream-map-key ul {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,186 @@
+/* Keep the quiet palette readable on cream surfaces, including small labels. */
+.form-section-title,
+.dream-option > span {
+  color: #526448;
+}
+.dream-option > small {
+  color: #705b30;
+}
+.muted,
+.page-intro p,
+.section-kicker,
+.eyebrow,
+.intro-eyebrow,
+.board-legend,
+.round-badge,
+.turn-number,
+.roll-footnote,
+.player-top small,
+.player-numbers > span,
+.player-bottom,
+.activity-item small,
+.page-footer,
+.page-footer > .text-button,
+.dream-mini > div > span,
+.deck-choice small,
+.callout small,
+.form-field small,
+.settings-summary dt,
+.deal-details dt,
+.market-asset small,
+.worksheet-field > span small,
+.field-hint,
+.finance-overview p,
+.finance-overview > div:last-child > span,
+.tabs button,
+.portfolio-item p,
+.portfolio-item small,
+.debt-item small,
+.ledger-item small,
+.ledger-item p,
+.loan-box > p,
+.empty-state p,
+.toggle-row small,
+.help-intro p,
+.help-steps p,
+.help-detail p,
+.autosave-note p,
+.save-slot-info > small,
+.results-stats span,
+.rank-row.heading,
+.receipt-bar,
+.minor-heading h2 > span,
+.minor-heading > .text-button,
+.live-dot,
+.activity-item p,
+.setup-feature p {
+  color: #65745b;
+}
+.stat-description {
+  color: #b9cbb0;
+}
+.turn-pill {
+  color: #44663c;
+}
+.first-turn strong,
+.first-turn p,
+.first-turn .text-button {
+  color: #74704b;
+}
+.legend-dream {
+  color: #8b722b !important;
+}
+.dream-mini strong,
+.deal-yield > span,
+.deal-yield > span:last-child,
+.help-detail summary,
+.help-detail a,
+.settings-summary dd,
+.deal-details dd,
+.save-slot-info .form-field,
+.help-steps h4,
+.help-intro h3,
+.toggle-row strong,
+.portfolio-item h4,
+.debt-item h4,
+.ledger-item h4,
+.statement-row > span,
+.loan-box h3,
+.autosave-note strong,
+.rank-row,
+.worksheet-field > span,
+.form-field,
+.results-stats strong,
+.help-steps section > span,
+.empty-state,
+.empty-state h3,
+.player-numbers strong small,
+.you-label {
+  color: #61754c;
+}
+.field-error,
+.inline-error {
+  color: #98593f;
+}
+.negative {
+  color: #a95d43 !important;
+}
+.financial-strip .negative {
+  color: #f0b79f !important;
+}
+.board-legend,
+.stat-description,
+.player-bottom,
+.roll-footnote {
+  font-size: max(9px, 0.61rem);
+}
+.player-top small,
+.player-numbers > span,
+.player-numbers strong small {
+  font-size: 9px;
+}
+.player-top .avatar {
+  flex-shrink: 0;
+}
+.player-top strong {
+  line-height: 1.4;
+}
+.rank-row > span {
+  min-width: 0;
+}
+.save-slot-info input {
+  color: #536b43;
+}
+.finance-overview .eyebrow,
+.finance-overview p,
+.finance-overview > div:last-child > span,
+.card-category,
+.deal-yield > span,
+.deal-yield > span:last-child,
+.deal-yield > strong > small,
+.statement-grid h3,
+.statement-row strong,
+.statement-total,
+.statement-total strong {
+  color: #526544;
+}
+.nav-link,
+.local-status,
+.section-heading h2 em,
+.round-badge,
+.freedom-copy p,
+.freedom-copy > div > span,
+.activity-item strong {
+  color: #5d6e51;
+}
+.legend-dream {
+  color: #806823 !important;
+}
+.first-turn strong,
+.first-turn p,
+.first-turn .text-button {
+  color: #6c6844;
+}
+html[data-speed="instant"] .board-token {
+  transition: none;
+}
+html[data-speed="fast"] .board-token {
+  transition: transform 0.35s ease-in-out;
+}
+html[data-speed="normal"] .board-token {
+  transition: transform 0.8s ease-in-out;
+}
+@media (max-width: 760px) {
+  .board-legend {
+    font-size: 8px;
+  }
+  .player-bottom {
+    font-size: 8px;
+  }
+  .player-top small {
+    font-size: 8px;
+  }
+  .player-numbers > span {
+    font-size: 9px;
+  }
+}
