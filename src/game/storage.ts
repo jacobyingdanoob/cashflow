@@ -92,7 +92,8 @@ function validPlayer(p: Player) {
   check(typeof p.bankrupt === "boolean");
   if (p.elimination !== undefined)
     check(
-      record(p.elimination) && p.eliminated &&
+      record(p.elimination) &&
+        p.eliminated &&
         Number.isInteger(p.elimination.round) &&
         p.elimination.round >= 1 &&
         typeof p.elimination.reason === "string" &&
@@ -436,7 +437,9 @@ export function validateSave(value: unknown): GameState {
       reviewFields.every((v) => v !== undefined),
   );
   initializeReview(s);
-  check(s.players.every((p) => !p.elimination || p.elimination.round <= s.round));
+  check(
+    s.players.every((p) => !p.elimination || p.elimination.round <= s.round),
+  );
   const strings = (v: unknown): v is string[] =>
     Array.isArray(v) && v.every((t) => typeof t === "string");
   check(

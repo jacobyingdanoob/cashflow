@@ -9,7 +9,7 @@ import {
 import {
   professions,
   dreams,
-  outerBoard,
+  fastTrackBoard,
   smallDeals,
 } from "../src/game/content";
 import { installment } from "../src/game/economy";
@@ -1022,9 +1022,8 @@ test("dreams have individual icons, labels and a persistent chosen marker", asyn
 }) => {
   const game = createGame({ dream: "forest" });
   game.players[0].stage = "fast";
-  game.players[0].position = outerBoard.findIndex(
-    (s) => s.content === "forest",
-  );
+  const board = fastTrackBoard(game.players);
+  game.players[0].position = board.findIndex((s) => s.content === "forest");
   await seed(page, game);
   const yours = page.locator(".your-dream-space");
   await expect(yours).toHaveCount(1);
@@ -1035,21 +1034,191 @@ test("dreams have individual icons, labels and a persistent chosen marker", asyn
   await expect(yours).toContainText("YOUR DREAM");
   await expect(yours).toContainText("FOREST CABIN");
   const symbols = new Set<string>();
-  for (const dream of dreams) {
+  for (const dream of dreams.filter((d) =>
+    game.players.some((p) => p.dream === d.id),
+  )) {
     const space = page
       .locator(".board-space")
       .filter({ has: page.locator("title", { hasText: dream.name }) });
     await expect(space).toHaveCount(1);
     symbols.add(await space.locator("svg").innerHTML());
-    expect(outerBoard.some((s) => s.content === dream.id)).toBe(true);
+    expect(board.some((s) => s.content === dream.id)).toBe(true);
   }
-  expect(symbols.size).toBe(8);
+  expect(symbols.size).toBe(game.players.length);
   await page.locator(".dream-map-key summary").click();
   await expect(page.locator(".dream-map-key")).toContainText(
     "A cabin in the forest · Yours ★",
   );
+  await expect(page.locator(".dream-map-key li")).toHaveCount(
+    game.players.length,
+  );
   await expectAccessible(page);
   await page.screenshot({ path: "test-results/dream-map.png", fullPage: true });
+});
+
+test("notification filtering persists and clear all removes visible and hidden updates", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const game = reduceGame(createGame({ profession: "designer" }), {
+      type: "BORROW",
+      amount: 100000,
+    }),
+    own = game.notices[0],
+    f = playerFinancials(game),
+    shared = {
+      ...own,
+      id: ++game.sequence,
+      kind: "npc-turn" as const,
+      player: "p1",
+      title: "Maya changed your finances",
+      changes: [
+        {
+          player: "p0",
+          before: f,
+          after: { ...f, cash: f.cash + 100, netWorth: f.netWorth + 100 },
+        },
+      ],
+    },
+    unrelated = {
+      ...own,
+      id: ++game.sequence,
+      kind: "npc-turn" as const,
+      player: "p1",
+      title: "Maya unrelated turn",
+      changes: [{ player: "p0", before: f, after: f }],
+    };
+  game.notices = [own, shared, unrelated];
+  await seed(page, game);
+  await page.getByRole("checkbox", { name: "Only involving me" }).check();
+  await expect(
+    page.getByRole("button", {
+      name: "View details: Maya unrelated turn",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "View details: Bank loan", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "View details: Maya changed your finances",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect((await readState(page)).notices).toHaveLength(3);
+  await expectAccessible(page);
+  await page.reload();
+  await expect(
+    page.getByRole("checkbox", { name: "Only involving me" }),
+  ).toBeChecked();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".game-notification")).toHaveCount(1);
+  await page.screenshot({
+    path: "test-results/notification-controls-phone.png",
+    fullPage: true,
+  });
+  await expectAccessible(page);
+  await page
+    .getByRole("button", { name: "Clear all notifications", exact: true })
+    .click();
+  await expect(
+    page.getByRole("complementary", { name: "Game notifications" }),
+  ).toHaveCount(0);
+  const cleared = await readState(page);
+  expect(cleared.notices).toEqual([]);
+  expect(cleared.players).toEqual(game.players);
+  expect(cleared.rng).toBe(game.rng);
+  expect(cleared.history).toEqual(game.history);
+  await page.getByRole("button", { name: "Game settings" }).click();
+  await expect(
+    page.getByRole("switch", { name: /Only notifications involving you/ }),
+  ).toBeChecked();
+});
+
+test("elimination opens a personal review, NPCs keep playing, and their finish opens the final report", async ({
+  page,
+}) => {
+  const now = new Date("2026-11-05T12:00:00Z");
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now);
+  const game = createGame({
+    profession: "designer",
+    opponents: 2,
+    roundLimit: 25,
+    speed: "fast",
+  });
+  game.round = 25;
+  game.players[0].salary = 0;
+  game.players[0].cash = 0;
+  game.phase = "decision";
+  game.decision = {
+    kind: "insolvency",
+    amount: 100000,
+    title: "Unpayable bill",
+  };
+  for (const p of game.players.slice(1)) p.skip = 1;
+  await seed(page, game);
+  await page.getByRole("button", { name: "Use bankruptcy recovery" }).click();
+  const personal = page.getByRole("dialog", {
+    name: "Your game-over overview",
+    exact: true,
+  });
+  await expect(personal).toBeVisible();
+  await expect(personal).toContainText("Your game ended in round 25.");
+  await expect(personal.locator(".history-chart")).toHaveCount(4);
+  await expect(personal).toContainText("A word from your game coach.");
+  const exit = (await readState(page)).players[0].elimination;
+  expect(exit).toBeDefined();
+  await page.clock.runFor(800);
+  expect((await readState(page)).current).toBe(1);
+  await expect(personal).toBeVisible();
+  await page.screenshot({
+    path: "test-results/personal-game-over.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Watch remaining players" }).click();
+  expect((await readState(page)).personalReviewSeen).toBe(true);
+  await page.reload();
+  await expect(personal).toHaveCount(0);
+  await page.getByRole("button", { name: "Open financial statement" }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Your game ended in round 25.",
+  );
+  await expect(page.getByRole("tab", { name: "Loans & debt" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page
+    .locator(".spectator-banner")
+    .getByRole("button", { name: "Review my game" })
+    .click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(personal).toBeVisible();
+  expect(
+    await personal.evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/personal-game-over-phone.png",
+    fullPage: true,
+  });
+  for (
+    let steps = 0;
+    steps < 8 && (await readState(page)).phase !== "finished";
+    steps++
+  )
+    await page.clock.runFor(800);
+  const results = page.getByRole("dialog", {
+    name: "Look at what you built",
+    exact: true,
+  });
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("GAME COMPLETE");
+  await expect(results.locator(".review-scoreboard tbody tr")).toHaveCount(3);
+  const final = await readState(page);
+  expect(final.phase).toBe("finished");
+  expect(final.winners).not.toContain("p0");
+  expect(final.players[0].elimination).toEqual(exit);
+  await page.clock.resume();
+  await expectAccessible(page);
 });
 
 test("many notifications form a compact stack with every update still readable", async ({

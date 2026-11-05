@@ -1,0 +1,24 @@
+appId: com.cashflow.game
+productName: Cashflow
+asar: true
+toolsets:
+  nsis: 1.2.1
+directories:
+  output: release
+files:
+  - dist/**/*
+  - desktop/main.cjs
+  - desktop/icon.ico
+  - package.json
+  - "!node_modules/**/*"
+win:
+  target:
+    - target: portable
+      arch:
+        - ia32
+  icon: desktop/icon.ico
+  signAndEditExecutable: false
+portable:
+  artifactName: Cashflow-${version}-windows-x86.exe
+  requestExecutionLevel: user
+  useZip: true

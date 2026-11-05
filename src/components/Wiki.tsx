@@ -440,6 +440,12 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
             marked space. In the full game, purchasing your selected dream wins
             immediately. You may pass if you cannot or do not want to buy.
           </p>
+          <p>
+            The board shows the dreams chosen by this table. New matches give
+            each player a distinct dream, with unused dream spaces becoming
+            opportunities. The layout stays fixed after an elimination. Shared
+            dreams in older saves remain available on one shared space.
+          </p>
           <h4>Why its price can rise</h4>
           <p>
             The current price includes the sandbox dream-price multiplier and

@@ -271,6 +271,12 @@ function Help() {
           and retail balances and payments if needed, and loses three turns. If
           cash or monthly cash flow cannot recover, you are eliminated.
         </p>
+        <p>
+          Elimination opens your personal overview with charts and coaching.
+          NPCs continue while you read; close the review to watch their turns.
+          The final report opens when the match ends. Your exit finances stay
+          fixed, and the review remains available from the spectator banner.
+        </p>
       </details>
       <details className="help-detail">
         <summary>Debt repayments and liquidity</summary>
@@ -306,6 +312,12 @@ function Help() {
           for 30 seconds. Click one to expand its financial details.
           Notifications and their details do not pause NPCs. The Pause control
           lets you stop NPC play when you need more time.
+        </p>
+        <p>
+          Clear all removes every notification, including filtered updates. Only
+          involving me keeps your events and updates that change your finances;
+          the same preference is available in settings. Hidden updates still
+          expire after 30 seconds.
         </p>
       </details>
       <details className="help-detail">
@@ -581,7 +593,11 @@ export default function App() {
               <Settings2 size={19} />
             </button>
             <span className="header-divider" />
-            <button className="save-header" onClick={() => setPanel("saves")}>
+            <button
+              className="save-header"
+              aria-label="Save & resume"
+              onClick={() => setPanel("saves")}
+            >
               <Save size={16} />
               <span>Save & resume</span>
             </button>

@@ -281,7 +281,7 @@ a {
 }
 .page-intro h1 span {
   font-weight: 450;
-  color: #6a8064;
+  color: #526e42;
 }
 .page-intro p {
   font-size: 12px;
@@ -1016,7 +1016,7 @@ a {
 }
 .receipt-bar strong {
   font-weight: 550;
-  color: #607d56;
+  color: #526e42;
 }
 .receipt-bar .text-button {
   font-size: 9px;
@@ -2511,7 +2511,7 @@ html[data-motion="reduced"] *:after {
     flex: 1;
     padding: 9px 6px;
     font-size: 10px;
-    color: #929e7b;
+    color: #526e42;
     display: flex;
     justify-content: center;
     align-items: center;

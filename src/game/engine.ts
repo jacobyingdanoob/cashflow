@@ -755,9 +755,20 @@ function land(s: GameState) {
         log(s, "Another visit increased the price of this chosen dream.");
       }
       s.dreamVisits[id] = visitors;
-      const humanOwner = s.players.find((other) => other.human && !other.eliminated && other.id !== p.id && other.dream === id);
+      const humanOwner = s.players.find(
+        (other) =>
+          other.human &&
+          !other.eliminated &&
+          other.id !== p.id &&
+          other.dream === id,
+      );
       if (humanOwner)
-        notice(s, humanOwner, "Your dream price increased", `${p.name} visited ${space.label}. Your dream now costs ${money(dreamPrice(s, id))}.`);
+        notice(
+          s,
+          humanOwner,
+          "Your dream price increased",
+          `${p.name} visited ${space.label}. Your dream now costs ${money(dreamPrice(s, id))}.`,
+        );
       if (p.dream === id) {
         s.decision = { kind: "dream", id };
         s.phase = "decision";

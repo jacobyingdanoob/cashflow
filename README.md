@@ -2,7 +2,25 @@
 
 A complete local browser playtest inspired by the CASHFLOW board-game mechanics. The city illustration, board, professions, and dreams are original. Original cards can optionally be joined by a sourced adaptation of the [Cash Flow Lifestyle encyclopedia](https://cashflow.lifestyle/encyclopedia/). Built with React, TypeScript, Vite, and SVG, with no backend, accounts, AI API, or paid services. Fonts are bundled locally.
 
-## Run locally
+## Windows desktop app (x86)
+
+Download **Cashflow-1.0.0-windows-x86.exe** from the [GitHub release](https://github.com/jacobyingdanoob/cashflow/releases/latest) and double-click it. This is a portable 32-bit app for Windows 10 or later, including 64-bit Windows. It includes the game and its runtime, works offline, and requires no installation, Node.js, administrator access, or separate browser.
+
+The first launch extracts the bundled runtime into a temporary folder. Saves remain in `%APPDATA%\Cashflow` when the app closes, moves, or updates. The desktop app has its own saves, separate from browser saves. The executable is unsigned.
+
+To build the same Windows executable from source:
+
+```sh
+npm ci
+npm run desktop:build
+npm run desktop:smoke
+```
+
+The executable is written to `release/`. The smoke test launches the actual portable executable, verifies both Windows binaries are x86, rolls the dice offline, and checks that saves survive reopening. Screenshots go to `test-results/desktop/`. `npm run desktop` runs the desktop app from source. The icon can be regenerated on Windows with `powershell -NoProfile -File desktop/generate-icon.ps1`.
+
+The desktop wrapper uses Electron **43.8.7**. Electron 43 is the final series with Windows x86 binaries; its support ends in January 2027. Later Electron versions require a 64-bit desktop build.
+
+## Web development
 
 Requires Node.js 22.12+ or 24+ and npm.
 
@@ -22,8 +40,11 @@ Open the localhost URL printed in the terminal. Production build: `npm run build
 - In **guided manual accounting**, enter the new totals for each affected field. Hints and revealed answers carry no penalty. Transactions commit once, only after validation. Pending worksheets and typed drafts survive refresh.
 - Economic settings affect every participant equally and are fixed during a match. NPC difficulty, personality, and cash reserves affect decisions; opponents never receive better rolls or hidden deck information.
 - Every completed NPC turn and human event produces a small bottom-right notification, including automatic expenses, family events, Payday, market effects, and economic cycles. Notifications dismiss after **30 seconds** or with their close button. Click to expand the roll, financial changes, and decision reasoning in a centered detail view. Phones show one card with earlier updates in an expandable list.
+- **Clear all** removes every pending notification, including hidden updates. **Only involving me** keeps human events and summaries or economic cycles that actually change the human's finances. The preference also appears in settings and persists in this browser. Filtering does not restart expiration timers, pause NPCs, or remove financial history. An NPC visit that raises your dream's price produces a personal notification.
+- New games assign distinct dreams to every player. The 32-space Fast Track shows one dream per player, spaced across the existing dream positions; unused positions become opportunities. Twelve fixed businesses, Payday and special events remain available. The board stays fixed after eliminations. Existing saves with shared dreams retain one accessible space per distinct chosen dream.
 - Unread notifications and expanded activity details **do not pause NPCs**. Required decisions and manual worksheets wait for input; finance/settings dialogs, the table’s Pause control, and a hidden browser tab pause NPC play.
 - The game overview opens automatically when the match ends. Compare every player’s passive income, debt, cash, monthly cash flow, expenses, and net worth on interactive charts. Hover or tap to see the event behind a change; focus a chart and use arrow keys, Home, or End for keyboard exploration. Toggle players and measures, and expand the event table for exact figures.
+- Human elimination first opens a personal game-over overview with the human's charts, exit finances, and coaching. Required manual accounting must commit before elimination is shown. NPCs continue while this overview is open; closing it acknowledges the review and survives refresh. Reopen it from **Review my game**. The final overview opens when the remaining match ends. Eliminated players' finances are frozen at exit so later economic cycles cannot rewrite their results.
 - The end-game coach reviews recorded decisions for the selected player. Suggestions cite actual borrowing, reserve shortfalls, repayments, income growth, investment sales, or passed opportunities. Coaching is generated locally from match data.
 
 ## Game wiki

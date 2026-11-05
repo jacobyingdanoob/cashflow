@@ -49,6 +49,7 @@ export default function Finances({
         <strong>{preciseMoney(value)}</strong>
       </div>
     ));
+  if (p.eliminated) return <GameReview game={game} personal={!results} />;
   return (
     <div className="finances-modal">
       {game.config.accounting === "auto" &&
