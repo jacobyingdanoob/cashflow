@@ -101,6 +101,13 @@ export default function RoleReveal({
             </div>
           ))}
         </dl>
+        {game.players.every((p) => p.profession === player.profession) && (
+          <p className="small muted">
+            Every player starts with this role and identical cash, debt, income
+            and expenses. Opponents bring different strategies to the same
+            starting finances.
+          </p>
+        )}
         <div className="role-debt-story">
           <strong>What your debt does</strong>
           <p>{role.debtStory}</p>

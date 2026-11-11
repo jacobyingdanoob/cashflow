@@ -11,6 +11,41 @@ import {
   fastTrackBoard,
   professions,
 } from "./content";
+import { marketById } from "./content";
+import {
+  initialMarkets,
+  marketShocks,
+  marketCopies,
+  marketCategories,
+  marketLabels,
+  purchaseQuote,
+  saleQuote,
+  opportunityType,
+  nextMarketIndex,
+  type1PurchaseCount,
+} from "./market";
+import {
+  addLoan,
+  borrowingQuote,
+  purchaseLending,
+  validLoanAmount,
+} from "./lending";
+import { personalities } from "./personalities";
+import { voluntarySaleQuote } from "./sales";
+import { introduceSpace } from "./tutorials";
+import {
+  activeDepression,
+  cycleRange,
+  cycleMovement,
+  initializeMarketDynamics,
+  marketTrends,
+  TREND_INTERVAL,
+} from "./trends";
+import {
+  discountCandidates,
+  canBargainBuy,
+  BARGAIN_THRESHOLD,
+} from "./bargains";
 import type {
   AccountingField,
   Asset,
@@ -22,10 +57,12 @@ import type {
   Player,
   Receipt,
   MarketCard,
+  MarketTick,
   FinancialHistoryPoint,
 } from "./types";
 import {
   assetIncome,
+  baseDebtPayment,
   assetValue,
   debtPayment,
   distressValue,
@@ -70,9 +107,7 @@ export function finances(
       (v, d) =>
         v +
         Math.round(
-          (d.kind === "bank"
-            ? Math.round((d.principal * annualRate) / 1200)
-            : d.payment) * factor(state, "loanPayments"),
+          baseDebtPayment(d, annualRate) * factor(state, "loanPayments"),
         ),
       0,
     );
@@ -261,6 +296,7 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
     typeof config.liquidityRisk === "boolean" &&
       typeof config.economicCycles === "boolean" &&
       typeof config.adaptedCards === "boolean" &&
+      typeof config.tutorials === "boolean" &&
       ["easy", "standard", "hard"].includes(config.roleDifficulty) &&
       [0, 0.5, 1, 2].includes(config.principalRate),
     "Choose supported risk and principal settings.",
@@ -268,8 +304,8 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
   requireRule(
     Number.isInteger(config.opponents) &&
       config.opponents >= 1 &&
-      config.opponents <= 5,
-    "Choose between one and five opponents.",
+      config.opponents <= 8,
+    "Choose between one and eight opponents.",
   );
   requireRule(
     [0.5, 1, 2, 5].includes(config.startingCash) &&
@@ -299,6 +335,7 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
     "Seed must be an integer between 1 and 4,294,967,295.",
   );
   const s: GameState = {
+    marketState: initialMarkets(),
     personalReviewSeen: false,
     smallDeckStage: "early",
     roleRevealed: false,
@@ -331,6 +368,8 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
     winners: [],
     finishReason: "",
     tutorialDone: false,
+    tutorialSeen: [],
+    tutorialQueue: [],
     history: [],
     historyStartRound: 1,
     notices: [],
@@ -343,6 +382,9 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
     "#d77863",
     "#6295a4",
     "#839765",
+    "#865c88",
+    "#477986",
+    "#aa633b",
   ];
   const profiles = ["cautious", "income", "bold", "diverse"] as const;
   const pool = shuffle(
@@ -357,16 +399,26 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
   // A shuffled subset is uniformly random without another source of randomness.
   const humanRole =
     config.profession === "random" ? eligible[0] : config.profession;
-  const selected = pool.indexOf(humanRole);
-  [pool[0], pool[selected]] = [pool[selected], pool[0]];
+  // Everyone shares the human's opening financial sheet. NPC personality and
+  // decision difficulty affect choices, never starting income or liabilities.
+  const pr = professions.find((p) => p.id === humanRole)!;
   for (let i = 0; i <= config.opponents; i++) {
-    const pr = professions.find((p) => p.id === pool[i])!;
     const availableDreams = dreams.filter(
       (d) => !s.players.some((p) => p.dream === d.id),
     );
     const p: Player = {
       id: `p${i}`,
-      name: ["You", "Maya", "Oliver", "Sofia", "Theo", "Amara"][i],
+      name: [
+        "You",
+        "Maya",
+        "Oliver",
+        "Sofia",
+        "Theo",
+        "Amara",
+        "Leo",
+        "Nina",
+        "Ezra",
+      ][i],
       human: i === 0,
       profile: profiles[(i + 3) % 4],
       profession: pr.id,
@@ -393,6 +445,7 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
       bankrupt: false,
       color: colors[i],
       decisionCount: 0,
+      stockGains: 0,
     };
     p.cash = Math.round(
       (pr.savings + finances(p, config.annualRate).flow) * config.startingCash,
@@ -401,7 +454,10 @@ export function createGame(options: Partial<GameConfig> = {}): GameState {
     s.players.push(p);
   }
   for (const kind of ["small", "large", "market", "expense"] as const)
-    s.decks[kind] = shuffle(s, deckIds(s.config, kind, s.smallDeckStage));
+    s.decks[kind] = shuffle(
+      s,
+      deckIds(s.config, kind, s.smallDeckStage, !!s.marketState),
+    );
   log(s, "A fresh start. Your first opportunity is one roll away.");
   for (const p of s.players) {
     const f = playerFinancials(s, p);
@@ -421,6 +477,7 @@ function deckIds(
   config: GameConfig,
   kind: keyof GameState["decks"],
   stage: GameState["smallDeckStage"],
+  modern = false,
 ) {
   if (kind === "small")
     return deals
@@ -430,11 +487,19 @@ function deckIds(
       );
   const cards =
     kind === "market"
-      ? markets
+      ? modern
+        ? marketShocks
+        : markets
       : kind === "expense"
         ? expenses
         : deals.filter((c) => c.tier === kind);
-  return cards.filter((c) => config.adaptedCards || !c.source).map((c) => c.id);
+  return cards
+    .filter((c) => config.adaptedCards || !c.source)
+    .flatMap((c) =>
+      Array<string>(
+        kind === "market" && modern ? marketCopies(c as MarketCard) : 1,
+      ).fill(c.id),
+    );
 }
 function draw(s: GameState, kind: keyof GameState["decks"]) {
   if (kind === "small") {
@@ -447,7 +512,10 @@ function draw(s: GameState, kind: keyof GameState["decks"]) {
     }
   }
   if (!s.decks[kind].length) {
-    s.decks[kind] = shuffle(s, deckIds(s.config, kind, s.smallDeckStage));
+    s.decks[kind] = shuffle(
+      s,
+      deckIds(s.config, kind, s.smallDeckStage, !!s.marketState),
+    );
   }
   return s.decks[kind].pop()!;
 }
@@ -555,7 +623,7 @@ function transaction(
   );
 }
 export function eligibleAssets(s: GameState, p: Player, cardId: string) {
-  const c = markets.find((m) => m.id === cardId);
+  const c = marketById(cardId);
   return c ? p.assets.filter((a) => a.category === c.category) : [];
 }
 export const salePrice = (a: Asset, multiplier: number, state?: GameState) =>
@@ -565,11 +633,16 @@ export const marketSalePrice = (
   card: MarketCard,
   state?: GameState,
 ) =>
-  card.sharePrice !== undefined
-    ? Math.round(card.sharePrice * factor(state, "values", "stock")) *
-        a.shares -
-      a.mortgage
-    : salePrice(a, card.multiplier, state);
+  state?.marketState
+    ? marketSaleQuote(state, a).net
+    : card.sharePrice !== undefined
+      ? Math.round(card.sharePrice * factor(state, "values", "stock")) *
+          a.shares -
+        a.mortgage
+      : salePrice(a, card.multiplier, state);
+export function marketSaleQuote(s: GameState, a: Asset) {
+  return saleQuote(s, a, assetValue(s, a));
+}
 export function dreamPrice(s: GameState, id: string) {
   return (
     Math.round(
@@ -579,7 +652,9 @@ export function dreamPrice(s: GameState, id: string) {
   );
 }
 function responder(s: GameState) {
-  return s.decision?.kind === "market" ? s.decision.responder : s.current;
+  return s.decision?.kind === "market" || s.decision?.kind === "discount"
+    ? s.decision.responder
+    : s.current;
 }
 export function actingPlayer(s: GameState) {
   return s.players[responder(s)];
@@ -612,10 +687,248 @@ function charge(
       description,
     );
 }
+function repriceMarket(s: GameState, card: MarketCard) {
+  applyMarketChange(s, {
+    category: card.category,
+    card: card.id,
+    title: card.name,
+    player: s.players[s.current].id,
+    source: "shock",
+    changeBps: Math.round((card.multiplier - 1) * 10000),
+  });
+}
+function applyMarketChange(
+  s: GameState,
+  event: Omit<MarketTick, "id" | "round" | "before" | "after">,
+  quiet = false,
+) {
+  const market = s.marketState!,
+    before = s.players.map((p) => playerFinancials(s, p)),
+    previous = market.indices[event.category],
+    proposed = nextMarketIndex(previous, 1 + event.changeBps! / 10000);
+  let depression = activeDepression(s, event.category);
+  const priorDepression = market.dynamics?.depressions?.[event.category];
+  if (
+    !depression &&
+    proposed < 3500 &&
+    (previous >= 3500 || !priorDepression)
+  ) {
+    depression = {
+      start: s.round,
+      expires: s.round + 5 + Math.floor(random(s) * 6),
+    };
+    market.dynamics!.depressions![event.category] = depression;
+    notice(
+      s,
+      s.players[0],
+      `${marketLabels[event.category]} depression`,
+      `Prices stay below 35% through round ${depression.expires - 1}. Ordinary fluctuations continue; economic trend forces pause in this market. Market-space shocks remain capped below 35%. Discount purchases remain available.`,
+    );
+  }
+  const next = depression ? Math.min(3499, proposed) : proposed;
+  market.indices[event.category] = next;
+  market.history.push({
+    ...event,
+    id: ++s.sequence,
+    round: s.round,
+    before: previous,
+    after: next,
+    ...(depression ? { depression: { ...depression } } : {}),
+  });
+  for (const [i, p] of s.players.entries()) {
+    if (p.eliminated) continue;
+    const after = playerFinancials(s, p),
+      note = `${event.title}: ${(100 * (next / previous - 1)).toFixed(2)}% actual change. Market index ${(previous / 100).toFixed(2)}% → ${(next / 100).toFixed(2)}%.${event.cycleDrawBps !== undefined ? ` Cycle baseline ${(event.cycleDrawBps / 100).toFixed(2)}%, adjusted toward 100%; ordinary fluctuation ${(event.fluctuationBps! / 100).toFixed(2)}%.` : ""}${depression ? ` Depression cap: below 35% through round ${depression.expires - 1}.` : ""} Changes compound without a reset. Property rent is unchanged; business and stock operating income follow 25% of the index's move from 100%. Revaluation does not add or remove cash.`;
+    if (
+      before[i].assets !== after.assets ||
+      before[i].passive !== after.passive
+    ) {
+      const receipt = {
+        id: ++s.sequence,
+        player: p.id,
+        title: event.title,
+        note,
+        before: before[i],
+        after,
+      };
+      s.receipts.unshift(receipt);
+      historyPoint(s, p, event.title, note, "transaction", before[i], after);
+      if (!quiet) notice(s, p, event.title, note, receipt);
+    }
+  }
+  s.receipts = s.receipts.slice(0, 60);
+}
+function marketRound(s: GameState) {
+  initializeMarketDynamics(s);
+  const market = s.marketState!,
+    dynamics = market.dynamics!;
+  if (dynamics.lastRound >= s.round) return;
+  dynamics.lastRound = s.round;
+  dynamics.roundOpen = { ...market.indices };
+  const before = s.players.map((p) => playerFinancials(s, p));
+  if (dynamics.active && dynamics.active.expires <= s.round)
+    dynamics.active = null;
+  let drawn = false;
+  if (s.config.economicCycles && s.round % TREND_INTERVAL === 0) {
+    if (!dynamics.deck.length)
+      dynamics.deck = shuffle(
+        s,
+        marketTrends.map((c) => c.id),
+      );
+    const drawnId = dynamics.deck.pop();
+    const card = marketTrends.find((c) => c.id === drawnId)!;
+    dynamics.active = {
+      card: card.id,
+      start: s.round,
+      expires: s.round + card.duration,
+    };
+    drawn = true;
+  }
+  const trend = dynamics.active
+    ? marketTrends.find((c) => c.id === dynamics.active!.card)!
+    : null;
+  const movements: string[] = [];
+  for (const category of marketCategories) {
+    let fluctuation: number;
+    if (category === "stock") {
+      const pick = Math.floor(random(s) * 202);
+      fluctuation = pick <= 100 ? -200 - pick : 200 + pick - 101;
+    } else {
+      const max = category === "property" ? 25 : 100;
+      fluctuation = Math.floor(random(s) * (max * 2 + 1)) - max;
+    }
+    const range =
+      trend && !activeDepression(s, category)
+        ? cycleRange(trend, category)
+        : undefined;
+    const cycleDraw = range
+      ? range[0] + Math.floor(random(s) * (range[1] - range[0] + 1))
+      : undefined;
+    const bps =
+      cycleDraw === undefined
+        ? fluctuation
+        : cycleMovement(
+            cycleDraw,
+            category,
+            market.indices[category],
+            fluctuation,
+          );
+    const previous = market.indices[category];
+    applyMarketChange(
+      s,
+      {
+        category,
+        card: cycleDraw === undefined ? `drift-${category}` : trend!.id,
+        player: "",
+        title:
+          cycleDraw === undefined
+            ? `${marketLabels[category]} · Round ${s.round} fluctuation`
+            : `${trend!.name} · ${marketLabels[category]}`,
+        source: cycleDraw === undefined ? "drift" : "trend",
+        changeBps: bps,
+        model: 2,
+        fluctuationBps: fluctuation,
+        ...(cycleDraw !== undefined
+          ? { trendStart: dynamics.active!.start, cycleDrawBps: cycleDraw }
+          : {}),
+      },
+      true,
+    );
+    const actual = (market.indices[category] / previous - 1) * 100;
+    movements.push(
+      `${marketLabels[category]} ${actual > 0 ? "+" : ""}${actual.toFixed(2)}%`,
+    );
+  }
+  const changes = s.players
+    .filter((p) => !p.eliminated)
+    .map((p) => ({
+      player: p.id,
+      before: before[s.players.indexOf(p)],
+      after: playerFinancials(s, p),
+    }));
+  if (
+    drawn ||
+    changes.some(
+      (c) =>
+        c.before.assets !== c.after.assets ||
+        c.before.passive !== c.after.passive,
+    )
+  )
+    s.notices.push({
+      id: ++s.sequence,
+      kind: drawn ? "cycle" : "event",
+      player: s.players[0].id,
+      round: s.round,
+      title: drawn ? trend!.name : `Round ${s.round} markets`,
+      description: `${movements.join(" · ")}.${trend ? ` Trend active through round ${dynamics.active!.expires - 1}; prices do not reset afterward.` : " Ordinary market fluctuations."}`,
+      events: movements,
+      reasons: [],
+      dice: [],
+      changes,
+      ...(drawn ? { eventId: trend!.id, tone: trend!.tone } : {}),
+    });
+}
+function startDiscountOffer(s: GameState, market: string) {
+  const category = marketById(market)!.category,
+    candidates = discountCandidates(s, category);
+  const queue = s.players.flatMap((p, i) =>
+    !p.eliminated && !p.bankrupt && !p.skip ? [i] : [],
+  );
+  if (!candidates.length || !queue.length) return false;
+  const card = candidates[Math.floor(random(s) * candidates.length)];
+  s.decision = {
+    kind: "discount",
+    card: card.id,
+    market,
+    responder: queue[0],
+    remaining: queue.slice(1),
+  };
+  s.phase = "decision";
+  log(
+    s,
+    `Discounted market offer: ${card.name}. Each eligible player may buy once or pass at the same current price.`,
+  );
+  if (queue.includes(0))
+    notice(
+      s,
+      s.players[0],
+      "Discounted market offer",
+      `${card.name} is available at ${(s.marketState!.indices[category] / 100).toFixed(2)}% of its opening price. Everyone receives the same randomly selected asset and chooses independently whether to buy. Fees and financing still apply.`,
+    );
+  return true;
+}
+function advanceDiscount(s: GameState) {
+  if (s.phase === "finished") return;
+  const d = s.decision;
+  requireRule(
+    d?.kind === "discount",
+    "There is no discount offer to complete.",
+  );
+  if (d.remaining.length)
+    s.decision = {
+      ...d,
+      responder: d.remaining[0],
+      remaining: d.remaining.slice(1),
+    };
+  else {
+    s.decision = null;
+    s.phase = "end";
+  }
+}
+function completeDiscountPurchase(s: GameState) {
+  if (s.pending) s.pending.completeDiscount = true;
+  else advanceDiscount(s);
+}
 function marketResponse(s: GameState, card: string) {
   const queue = s.players
     .map((p, i) =>
-      !p.eliminated && eligibleAssets(s, p, card).length ? i : -1,
+      !p.eliminated &&
+      (eligibleAssets(s, p, card).length ||
+        (s.marketState &&
+          s.marketState.indices[marketById(card)!.category] <
+            BARGAIN_THRESHOLD))
+        ? i
+        : -1,
     )
     .filter((i) => i >= 0);
   if (queue.length) {
@@ -627,12 +940,12 @@ function marketResponse(s: GameState, card: string) {
     };
     s.phase = "decision";
     if (!s.players[s.current].human && queue.includes(0)) {
-      const event = markets.find((m) => m.id === card)!;
+      const event = marketById(card)!;
       notice(
         s,
         s.players[0],
         event.name,
-        `${s.players[s.current].name} drew this market event. ${event.description} You hold an eligible investment. Use the decision panel to review your response.`,
+        `${s.players[s.current].name} drew this market event. ${event.description} ${eligibleAssets(s, s.players[0], card).length ? "You hold an eligible investment." : "This market is below 50%; a shared discounted offer follows the sale responses."} Use the decision panel to review your response.`,
       );
     }
   } else log(s, "Market update: nobody holds an eligible asset.");
@@ -643,6 +956,7 @@ function land(s: GameState) {
       p.position
     ];
   log(s, `Landed on ${space.label.toLowerCase()}.`);
+  introduceSpace(s, p, space.kind);
   switch (space.kind) {
     case "payday":
       break;
@@ -688,14 +1002,15 @@ function land(s: GameState) {
       break;
     case "market": {
       const id = draw(s, "market");
-      const c = markets.find((c) => c.id === id)!;
+      const c = marketById(id)!;
       log(s, c.name);
+      if (s.marketState) repriceMarket(s, c);
       marketResponse(s, id);
       notice(
         s,
         p,
         c.name,
-        `${c.description} ${s.decision ? "Eligible owners can respond in the decision panel." : "Nobody holds an eligible asset, so no financial change occurs."}`,
+        `${c.description} ${s.decision ? "Eligible owners can respond in the decision panel." : "No owner has an eligible holding. The new market price still applies to future opportunities."}`,
       );
       break;
     }
@@ -838,6 +1153,10 @@ function checkLiquidity(s: GameState, p: Player, resume: "roll" | "end") {
   return true;
 }
 function economicRound(s: GameState) {
+  if (s.marketState) {
+    marketRound(s);
+    return;
+  }
   if (s.economy.lastRound >= s.round) return;
   s.economy.lastRound = s.round;
   const before = s.players.map((p) => playerFinancials(s, p));
@@ -940,6 +1259,43 @@ function settlePrincipal(s: GameState, p: Player) {
   );
   return !!s.pending;
 }
+function saleNote(q: ReturnType<typeof saleQuote>) {
+  return `Sale ${preciseMoney(q.gross)} − bank fee ${preciseMoney(q.fee)} − early payoff ${preciseMoney(q.penalty)} − capital gains tax ${preciseMoney(q.tax)} − mortgage ${preciseMoney(q.mortgage)} = ${preciseMoney(q.net)} cash. Taxable profit: ${preciseMoney(q.taxableProfit)}.`;
+}
+function settleListedSales(s: GameState, playerId: string) {
+  const owner = () => s.players.find((p) => p.id === playerId)!;
+  const due = owner().assets.filter(
+    (a) => a.listing && a.listing.closesRound <= s.round,
+  );
+  for (const asset of due) {
+    const p = owner(),
+      q = voluntarySaleQuote(s, asset);
+    if (p.cash + q.net < 0) {
+      transaction(
+        s,
+        p,
+        `Sale cancelled: ${asset.name}`,
+        (n) => {
+          delete n.assets.find((a) => a.id === asset.id)!.listing;
+        },
+        `Closing needs ${preciseMoney(-q.net)} to clear the mortgage and costs, but only ${preciseMoney(p.cash)} is available. The asset remains yours; no fees were charged.`,
+      );
+    } else {
+      transaction(
+        s,
+        p,
+        `Sold ${asset.name}`,
+        (n) => {
+          n.cash += q.net;
+          n.assets = n.assets.filter((a) => a.id !== asset.id);
+        },
+        `Scheduled sale completed. Agreed quick-sale discount: ${q.discountBps / 100}%. ${saleNote(q)}`,
+      );
+    }
+    if (s.pending || s.phase === "finished") return true;
+  }
+  return false;
+}
 function drain(s: GameState) {
   while (
     s.effects.length &&
@@ -951,6 +1307,7 @@ function drain(s: GameState) {
     const p = s.players[s.current];
     if (effect.kind === "landing") land(s);
     else {
+      introduceSpace(s, p, "payday");
       const flow = playerFinancials(s, p).flow * effect.times;
       if (flow < 0) charge(s, p, -flow, "Payday: cash flow shortfall");
       else
@@ -989,6 +1346,8 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
   } as GameState;
   initializeEconomy(s);
   initializeReview(s);
+  s.tutorialQueue ??= [];
+  initializeMarketDynamics(s);
   s.smallDeckStage ??= "normal";
   if (action.type === "REVEAL_ROLE") {
     s.roleRevealed = true;
@@ -1008,7 +1367,8 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
     return s;
   }
   requireRule(
-    s.phase !== "finished" || action.type === "SPEED",
+    s.phase !== "finished" ||
+      ["SPEED", "TUTORIAL", "TUTORIAL_MODE"].includes(action.type),
     "This match has finished. Start a new game to play again.",
   );
   if (action.type === "SPEED") {
@@ -1019,8 +1379,17 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
     s.config.speed = action.speed;
     return s;
   }
+  if (action.type === "TUTORIAL_MODE") {
+    s.config.tutorials = action.enabled;
+    if (!action.enabled) s.tutorialQueue = [];
+    return s;
+  }
   if (action.type === "TUTORIAL") {
     s.tutorialDone = true;
+    s.tutorialSeen = Array.from(
+      new Set([...(s.tutorialSeen ?? []), ...(action.key ? [action.key] : [])]),
+    );
+    s.tutorialQueue = s.tutorialQueue.filter((key) => key !== action.key);
     return s;
   }
   if (action.type === "SUBMIT") {
@@ -1040,6 +1409,7 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
       const pending = s.pending;
       s.pending = null;
       commit(s, pending.next, pending.receipt);
+      if (pending.completeDiscount) advanceDiscount(s);
       drain(s);
     }
     return s;
@@ -1058,6 +1428,63 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
     return s;
   }
   requireRule(!s.pending, "Finish your worksheet before continuing.");
+  if (action.type === "SELL_ANYTIME" || action.type === "CANCEL_SALE") {
+    const owner = s.players.find((p) => p.id === action.playerId);
+    requireRule(owner && !owner.eliminated, "Choose an active asset owner.");
+    requireRule(
+      owner.human || owner.id === actingPlayer(s).id,
+      "NPCs manage their own holdings.",
+    );
+    const asset = owner.assets.find((a) => a.id === action.assetId);
+    requireRule(asset, "You no longer own this asset.");
+    if (action.type === "CANCEL_SALE") {
+      requireRule(asset.listing, "This asset is not listed for sale.");
+      delete asset.listing;
+      log(s, `Cancelled the listing for ${asset.name}.`, "neutral", owner);
+      return s;
+    }
+    requireRule(!asset.listing, "This asset is already listed for sale.");
+    const q = voluntarySaleQuote(s, asset);
+    requireRule(
+      owner.cash + q.net >= 0,
+      "You cannot cover the sale costs and remaining mortgage from your cash.",
+    );
+    if (asset.category === "stock") {
+      transaction(
+        s,
+        owner,
+        `Sold ${asset.name}`,
+        (n) => {
+          n.cash += q.net;
+          n.stockGains = (n.stockGains ?? 0) + q.taxableProfit;
+          n.assets = n.assets.filter((a) => a.id !== asset.id);
+        },
+        `Immediate stock sale, with no quick-sale discount. ${saleNote(q)}`,
+      );
+    } else {
+      const wait = 1 + Math.floor(random(s) * 3);
+      asset.listing = {
+        listedRound: s.round,
+        closesRound: s.round + wait,
+        gross: q.gross,
+        discountBps: q.discountBps,
+      };
+      log(
+        s,
+        `Listed ${asset.name}: closes at the start of round ${asset.listing.closesRound}'s turn with a ${q.discountBps / 100}% discount.`,
+        "neutral",
+        owner,
+      );
+      notice(
+        s,
+        owner,
+        `${asset.name} listed for sale`,
+        `Closes at the start of your turn in round ${asset.listing.closesRound}. Agreed gross price: ${preciseMoney(q.gross)}, after a ${q.discountBps / 100}% quick-sale discount. Income and financing continue until closing. Fees, tax and the remaining mortgage are settled then; a matching market offer can still sell it immediately without this discount.`,
+      );
+    }
+    drain(s);
+    return s;
+  }
   if (s.decision?.kind === "liquidity")
     requireRule(
       ["LIQUIDATE", "BANKRUPT"].includes(action.type),
@@ -1075,7 +1502,7 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
     s.config.accounting = action.accounting;
     return s;
   }
-  const p = actingPlayer(s);
+  let p = actingPlayer(s);
   requireRule(
     !p.eliminated || action.type === "END",
     "Eliminated players can only finish their turn.",
@@ -1104,6 +1531,8 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         "You can only roll at the start of a turn.",
       );
       economicRound(s);
+      if (settleListedSales(s, p.id)) break;
+      p = actingPlayer(s);
       if (checkLiquidity(s, p, "roll")) break;
       if (p.skip) {
         p.skip--;
@@ -1182,9 +1611,11 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
       );
       break;
     }
+    case "BARGAIN_BUY":
     case "BUY": {
       const d = s.decision;
-      if (d?.kind === "dream") {
+      const bargain = action.type === "BARGAIN_BUY";
+      if (!bargain && d?.kind === "dream") {
         const price = dreamPrice(s, d.id);
         requireRule(
           p.cash >= price,
@@ -1199,49 +1630,85 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         break;
       }
       requireRule(
-        d?.kind === "opportunity" && d.card,
+        bargain || (d?.kind === "opportunity" && d.card),
         "There is no investment to purchase.",
       );
-      const card = effectiveDeal(
-        s,
-        deals.find((c) => c.id === d.card)!,
+      const original = deals.find(
+        (c) => c.id === (bargain ? action.card : (d as { card: string }).card),
       );
+      requireRule(original, "That investment does not exist.");
+      if (bargain)
+        requireRule(
+          canBargainBuy(s, p, original.category) &&
+            d?.kind === "discount" &&
+            d.card === original.id,
+          "Buy only the asset offered to you in the shared discount event below 50%.",
+        );
+      const card = effectiveDeal(s, original);
       requireRule(
         !s.claimed.includes(card.id),
         "That Fast Track business is already owned.",
       );
       const count = card.category === "stock" ? (action.shares ?? 1) : 1;
+      const quote = purchaseQuote(s, card, count, !!action.outright, p);
+      const loan = action.loan ?? 0;
+      requireRule(
+        validLoanAmount(loan),
+        "Purchase loans must be in $1,000 increments, up to $1,000,000.",
+      );
+      requireRule(
+        !loan ||
+          (!!s.marketState &&
+            opportunityType(card) === 1 &&
+            !action.outright &&
+            !p.bankrupt &&
+            !p.eliminated),
+        "The 1% purchase loan is available only with a financed Type 1 acquisition, outside bankruptcy recovery.",
+      );
+      const lending = purchaseLending(s, p, quote, loan);
+      requireRule(
+        !s.marketState || lending.allowed,
+        "Loan/mortgage declined: investment mortgage payments and bank-loan interest would exceed 55% of income after operating costs and mortgage financing. Starting role debt is excluded.",
+      );
       requireRule(
         Number.isSafeInteger(count) && count > 0 && count <= 100000,
         "Choose a whole number of shares from 1 to 100,000.",
       );
       requireRule(
-        p.cash >= card.down * count,
+        p.cash + loan >= quote.cash,
         "You need more cash for this investment. Borrow first or pass.",
       );
       if (card.tier === "fast") s.claimed.push(card.id);
-      s.decision = null;
-      s.phase = "end";
+      if (!bargain) {
+        s.decision = null;
+        s.phase = "end";
+      }
       transaction(
         s,
         p,
-        `Bought ${card.name}${count > 1 ? ` · ${count} shares` : ""}`,
+        `${bargain ? "Discount purchase: " : "Bought "}${card.name}${count > 1 ? ` · ${count} shares` : ""}`,
         (n) => {
-          n.cash -= card.down * count;
-          n.assets.push(assetFromDeal(card, `asset-${++s.sequence}`, count));
+          n.cash += loan - quote.cash;
+          addLoan(n, loan, true, !!s.marketState);
+          if (s.marketState && quote.mortgage > 0)
+            n.type1Purchases = type1PurchaseCount(s, p) + 1;
+          n.assets.push({
+            ...assetFromDeal(quote.deal, `asset-${++s.sequence}`, count),
+            boughtRound: s.round,
+            acquisitionFee: quote.fee,
+          });
         },
-        "Cash flow is net of financing.",
+        `Cash flow is net of financing.${s.marketState ? ` Acquisition fee: ${preciseMoney(quote.fee)}; total cash paid: ${preciseMoney(quote.cash)}.${quote.mortgage ? ` Type 1 acquisition #${quote.tier}: ${Math.round(quote.downRate * 100)}% down. Mortgage: ${preciseMoney(quote.mortgage)}; operating income ${preciseMoney(lending.operating)} − financing ${preciseMoney(lending.financing)} = ${preciseMoney(lending.net)}/month.` : ""}${loan ? ` Separate purchase loan: ${preciseMoney(loan)} at 1% monthly (${preciseMoney(lending.interest)}/month). Net after purchase-loan interest: ${preciseMoney(lending.netAfterLoan)}/month.` : ""}${quote.mortgage || loan ? ` Projected DTI: ${(lending.ratio * 100).toFixed(1)}% (limit 55%).` : ""}` : ""}`,
       );
+      if (bargain) completeDiscountPurchase(s);
       break;
     }
     case "SELL": {
       requireRule(
         s.decision?.kind === "market",
-        "Assets can only be sold during an eligible market event.",
+        "This market sale needs a matching market offer. Open Portfolio to list an asset or sell stocks anytime.",
       );
-      const c = markets.find(
-        (m) => m.id === (s.decision as { card: string }).card,
-      )!;
+      const c = marketById((s.decision as { card: string }).card)!;
       requireRule(
         c.effect === "offer",
         "This market event is not a sale offer.",
@@ -1254,7 +1721,7 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
       const proceeds = marketSalePrice(asset, c, s);
       requireRule(
         p.cash + proceeds >= 0,
-        "You cannot cover the mortgage shortfall on this sale.",
+        "You cannot cover the sale costs and remaining mortgage from your cash.",
       );
       transaction(
         s,
@@ -1262,9 +1729,17 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         `Sold ${asset.name}`,
         (n) => {
           n.cash += proceeds;
+          if (s.marketState && asset.category === "stock")
+            n.stockGains =
+              (n.stockGains ?? 0) + marketSaleQuote(s, asset).taxableProfit;
           n.assets = n.assets.filter((a) => a.id !== asset.id);
         },
-        "Sale proceeds are after mortgage settlement.",
+        s.marketState
+          ? (() => {
+              const q = marketSaleQuote(s, asset);
+              return `Sale ${preciseMoney(q.gross)} − bank fee ${preciseMoney(q.fee)} − early payoff ${preciseMoney(q.penalty)} − capital gains tax ${preciseMoney(q.tax)} − mortgage ${preciseMoney(q.mortgage)} = ${preciseMoney(q.net)} cash. Taxable profit: ${preciseMoney(q.taxableProfit)}.`;
+            })()
+          : "Sale proceeds are after mortgage settlement.",
       );
       break;
     }
@@ -1291,26 +1766,58 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
           action.price <= dollars(1000000),
         "Enter a valid transfer price.",
       );
+      const outright = !!s.marketState && target.profile === "income",
+        acquisition = purchaseQuote(s, card, 1, outright, target),
+        boughtCard = acquisition.deal,
+        policy = personalities[target.profile],
+        targetFinances = playerFinancials(s, target);
       requireRule(
-        target.cash >= card.down + action.price,
+        !s.marketState || purchaseLending(s, target, acquisition).allowed,
+        "That player's mortgage would exceed the 55% debt-to-income limit.",
+      );
+      requireRule(
+        target.cash >= acquisition.cash + action.price,
         "That player cannot afford the deal and fee.",
       );
-      const reserve =
-        (s.config.liquidityRisk
-          ? requiredReserve(target) + card.mortgage / 10
-          : 0) +
-        installment(target, s.config.principalRate) +
-        playerFinancials(s, target).expenses *
-          (target.profile === "cautious"
-            ? 2
-            : target.profile === "bold"
-              ? 0.3
-              : 1);
+      if (s.marketState)
+        requireRule(
+          !(target.profile === "cautious" && opportunityType(card) === 1) &&
+            !(
+              target.profile === "income" && (target.stockGains ?? 0) < 2000000
+            ),
+          "That player's personality declines this type of investment.",
+        );
+      const reserve = s.marketState
+        ? Math.ceil(
+            (targetFinances.debt + acquisition.mortgage) *
+              Math.max(policy.debtRatio, s.config.liquidityRisk ? 0.1 : 0),
+          ) +
+          Math.round(
+            targetFinances.expenses *
+              policy.months *
+              (s.config.difficulty === "hard" ? 1.1 : 1),
+          ) +
+          installment(target, s.config.principalRate) +
+          Math.round((acquisition.mortgage * s.config.principalRate) / 100)
+        : (s.config.liquidityRisk
+            ? requiredReserve(target) + card.mortgage / 10
+            : 0) +
+          installment(target, s.config.principalRate) +
+          playerFinancials(s, target).expenses *
+            (target.profile === "cautious"
+              ? 2
+              : target.profile === "bold"
+                ? 0.3
+                : 1);
       requireRule(
-        target.cash - card.down - action.price >= reserve &&
-          (assetIncome(s, assetFromDeal(card, "preview")) * 12) /
-            (card.down + action.price) >=
-            0.15,
+        target.cash - acquisition.cash - action.price >= reserve &&
+          ((s.marketState &&
+            (target.profile === "bold" ||
+              (target.profile === "income" &&
+                assetIncome(s, assetFromDeal(boughtCard, "preview")) > 0))) ||
+            (assetIncome(s, assetFromDeal(boughtCard, "preview")) * 12) /
+              (acquisition.cash + action.price) >=
+              (s.marketState ? 0.08 : 0.15)),
         "That player declines: the reserve or expected return is too low.",
       );
       s.decision = null;
@@ -1320,10 +1827,16 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         target,
         `Accepted ${card.name}`,
         (n) => {
-          n.cash -= card.down + action.price;
-          n.assets.push(assetFromDeal(card, `asset-${++s.sequence}`, 1));
+          n.cash -= acquisition.cash + action.price;
+          if (s.marketState && acquisition.mortgage > 0)
+            n.type1Purchases = type1PurchaseCount(s, target) + 1;
+          n.assets.push({
+            ...assetFromDeal(boughtCard, `asset-${++s.sequence}`, 1),
+            boughtRound: s.round,
+            acquisitionFee: acquisition.fee,
+          });
         },
-        `Paid ${money(action.price)} for the opportunity.`,
+        `Paid ${money(action.price)} for the opportunity.${s.marketState ? ` Acquisition fee: ${preciseMoney(acquisition.fee)}.${outright ? " Purchased outright without financing." : ""}` : ""}`,
       );
       transaction(s, p, "Opportunity transfer fee", (n) => {
         n.cash += action.price;
@@ -1372,24 +1885,21 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         "Bank loans must be positive $1,000 increments, up to $1,000,000.",
       );
       requireRule(!p.eliminated, "Eliminated players cannot borrow.");
+      requireRule(
+        !s.marketState || borrowingQuote(s, p, action.amount).allowed,
+        "Loan declined: bank-loan interest and investment mortgage payments would exceed 55% of income. Starting role debt is excluded.",
+      );
       transaction(
         s,
         p,
         "Bank loan",
         (n) => {
           n.cash += action.amount;
-          const loan = n.debts.find((d) => d.kind === "bank");
-          if (loan) loan.principal += action.amount;
-          else
-            n.debts.push({
-              id: "bank",
-              name: "Bank loan",
-              kind: "bank",
-              principal: action.amount,
-              payment: 0,
-            });
+          addLoan(n, action.amount, false, !!s.marketState);
         },
-        `${s.config.annualRate}% annual simple interest, charged each payday.`,
+        s.marketState
+          ? "2% monthly interest on outstanding principal, charged each payday. Separate from 1% Type 1 purchase loans. DTI checked against a 55% limit; starting role debt excluded."
+          : `${s.config.annualRate}% annual simple interest, charged each payday.`,
       );
       break;
     }
@@ -1472,13 +1982,14 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
             n.assets = n.assets.filter((v) => v.id !== a.id);
           }
           const sorted = [...n.debts].sort(
-            (a, b) => b.payment / b.principal - a.payment / a.principal,
+            (a, b) =>
+              debtPayment(s, b) / b.principal - debtPayment(s, a) / a.principal,
           );
           for (const d of sorted) {
             if (finances(n, s.config.annualRate, s).flow > 0) break;
             const available = Math.max(0, n.cash - bill);
             const amount =
-              d.kind === "bank"
+              d.kind === "bank" || d.kind === "purchase"
                 ? Math.min(
                     d.principal,
                     Math.floor(available / dollars(1000)) * dollars(1000),
@@ -1538,9 +2049,34 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         else charge(s, p, d.amount, d.title);
         break;
       }
-      if (s.decision.kind === "market") {
+      if (s.decision.kind === "discount") {
+        const card = effectiveDeal(
+          s,
+          deals.find((c) => c.id === (s.decision as { card: string }).card)!,
+        );
+        const f = playerFinancials(s, p),
+          quote = purchaseQuote(s, card);
+        const point = historyPoint(
+          s,
+          p,
+          `Passed on discounted ${card.name}`,
+          "Kept cash instead of buying the shared market offer.",
+          "decision",
+          f,
+          f,
+        );
+        point.opportunity = {
+          down: quote.cash,
+          income: assetIncome(s, assetFromDeal(quote.deal, "review")),
+          affordable:
+            p.cash >= quote.cash &&
+            (!s.marketState || purchaseLending(s, p, quote).allowed),
+        };
+        log(s, `Passed on discounted ${card.name}.`, "neutral", p);
+        advanceDiscount(s);
+      } else if (s.decision.kind === "market") {
         const d = s.decision,
-          c = markets.find((c) => c.id === d.card)!;
+          c = marketById(d.card)!;
         if (d.remaining.length)
           s.decision = {
             ...d,
@@ -1550,6 +2086,7 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
         else {
           s.decision = null;
           s.phase = "end";
+          if (s.marketState) startDiscountOffer(s, d.card);
         }
         if (c.effect === "split")
           transaction(
@@ -1577,7 +2114,8 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
             (c) => c.id === (s.decision as { card: string }).card,
           )!;
           const card = effectiveDeal(s, original);
-          const f = playerFinancials(s, p);
+          const f = playerFinancials(s, p),
+            quote = purchaseQuote(s, card, 1, false, p);
           const point = historyPoint(
             s,
             p,
@@ -1588,9 +2126,11 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
             f,
           );
           point.opportunity = {
-            down: card.down,
-            income: assetIncome(s, assetFromDeal(card, "review")),
-            affordable: p.cash >= card.down,
+            down: quote.cash,
+            income: assetIncome(s, assetFromDeal(quote.deal, "review")),
+            affordable:
+              p.cash >= quote.cash &&
+              (!s.marketState || purchaseLending(s, p, quote).allowed),
           };
         }
         s.decision = null;
@@ -1664,6 +2204,13 @@ export function reduceGame(state: GameState, action: GameAction): GameState {
       s.phase === "finished");
   if (!p.human && (ended || s.phase === "finished")) summarizeTurn(s, p);
   else if (ended) s.turnContext = null;
+  if (
+    ended &&
+    s.round !== state.round &&
+    s.phase !== "finished" &&
+    s.marketState
+  )
+    marketRound(s);
   s.notices = s.notices.slice(-40);
   return s;
 }

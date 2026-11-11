@@ -164,7 +164,7 @@ export const wikiCategories: {
   {
     id: "dreams",
     name: "Dreams",
-    description: "Eight goals to build toward on the Fast Track.",
+    description: "Nine goals to build toward on the Fast Track.",
   },
   {
     id: "special",

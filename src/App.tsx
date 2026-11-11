@@ -1,6 +1,14 @@
 import RoleReveal from "./components/RoleReveal";
-import Wiki from "./components/Wiki";
-import { useCallback, useEffect, useRef, useState } from "react";
+import Market, { MarketChanges } from "./components/Market";
+import { TrendBadge } from "./components/MarketTrend";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -29,7 +37,8 @@ import {
   X,
 } from "lucide-react";
 import Board, { Avatar } from "./components/Board";
-import DecisionPanel, { FirstTurn } from "./components/DecisionPanel";
+import DecisionPanel from "./components/DecisionPanel";
+import TutorialGuide, { TutorialTopic } from "./components/TutorialGuide";
 import Modal from "./components/Modal";
 import Setup from "./components/Setup";
 import Finances from "./components/Finances";
@@ -53,6 +62,8 @@ import {
 import { npcStep } from "./game/npc";
 import { loadGame, saveGame, saveInfo } from "./game/storage";
 import type { ActivityNotice, GameAction, GameState } from "./game/types";
+const Rulebook = lazy(() => import("./components/Rulebook"));
+const Wiki = lazy(() => import("./components/Wiki"));
 type Panel =
   | "new"
   | "finances"
@@ -63,6 +74,8 @@ type Panel =
   | "gameover"
   | "economy"
   | "wiki"
+  | "market"
+  | "rulebook"
   | null;
 function boot() {
   try {
@@ -240,6 +253,19 @@ function Help() {
         ))}
       </div>
       <details className="help-detail">
+        <summary>Interactive tutorial</summary>
+        <p>
+          Enable the tutorial in the new-game options for a click-through guide
+          led by a canvas-drawn dollar bill. It pauses play while it explains
+          the goal, portfolio strip, board, dice, players, and first-time
+          spaces. Each space category introduces itself on its first trigger,
+          including when you cross Payday. The first three opportunity visits
+          explain financed assets, debt-free purchases and stocks, one at a
+          time. Portfolio and debt explain themselves the first time you open
+          those views. Turn the guide off any time in the top-right settings.
+        </p>
+      </details>
+      <details className="help-detail">
         <summary>What counts as passive income?</summary>
         <p>
           Recurring share dividends plus net property and business cash flow.
@@ -251,11 +277,14 @@ function Help() {
       <details className="help-detail">
         <summary>Trading, hardship, and the unexpected</summary>
         <p>
-          Sell holdings only during matching market offers, liquidity crises, or
-          bankruptcy recovery. Cards explicitly marked transferable can be
-          offered to an NPC, who buys the investment and pays your proposed fee
-          if it fits their strategy. Players cannot pool money or sell assets
-          directly to one another.
+          Open your Portfolio to sell stocks immediately or list businesses and
+          real estate. Businesses close in 1–3 rounds with a 5% quick-sale
+          discount; property takes 1–3 rounds with a 15% discount. Matching
+          market-space sales are immediate without these discounts. Income and
+          financing continue until closing. Cards explicitly marked transferable
+          can be offered to an NPC, who buys the investment and pays your
+          proposed fee if it fits their strategy. Players cannot pool money or
+          sell assets directly to one another.
         </p>
         <p>
           Life expenses are mandatory. Babies add recurring household costs, up
@@ -298,14 +327,19 @@ function Help() {
         </p>
       </details>
       <details className="help-detail">
-        <summary>Economic cycles and notifications</summary>
+        <summary>Markets and notifications</summary>
         <p>
-          Sudden economic cycles begin in round 11, then every three rounds (11,
-          14, 17…). A seeded event changes asset values, operating income, or
-          financing costs for three rounds. Open Economic events & rules to see
-          all 16 cards, their real-life references, and the assets they affect,
-          plus the adapted card catalogue. Ordinary board events continue during
-          the opening ten rounds. Conditions apply equally to everyone.
+          In new games, market landings change stock, real-estate or business
+          prices for everyone with 15%–50% shocks. Markets also move each round;
+          a three-round economic trend is drawn every five rounds from round 5.
+          Click its badge beside the round counter for details. Every eligible
+          owner may sell or hold. All markets keep fluctuating during cycles,
+          which tend toward 100% at extremes. Below 50%, finishing all market
+          responses draws one random discounted asset for everyone to buy or
+          pass in turn. Below 35%, a 5–10-round depression caps prices. Open
+          Market for charts by round, and Rulebook for trading fees,
+          capital-gains tax, early mortgage payoff penalties and opponent
+          strategies.
         </p>
         <p>
           Turn summaries and automatic events appear in the bottom-right corner
@@ -314,10 +348,10 @@ function Help() {
           lets you stop NPC play when you need more time.
         </p>
         <p>
-          Clear all removes every notification, including filtered updates. Only
-          involving me keeps your events and updates that change your finances;
-          the same preference is available in settings. Hidden updates still
-          expire after 30 seconds.
+          Clear all sits beside Expand stack and removes every notification,
+          including filtered updates. In the top-right settings, Only
+          notifications involving you keeps your events and updates that change
+          your finances. Hidden updates still expire after 30 seconds.
         </p>
       </details>
       <details className="help-detail">
@@ -361,6 +395,8 @@ export default function App() {
     [toast, setToast] = useState(""),
     [paused, setPaused] = useState(false),
     [mobileTab, setMobileTab] = useState("board"),
+    [financialPlayerId, setFinancialPlayerId] = useState("p0"),
+    [requestedTutorial, setTutorial] = useState<TutorialTopic | null>(null),
     [prefs, setPrefs] = useState(() => ({
       sound: false,
       notificationsOnlyMine: false,
@@ -371,15 +407,52 @@ export default function App() {
     [menu, setMenu] = useState(false);
   const shownResults = useRef(false);
   const [activeNotice, setActiveNotice] = useState<ActivityNotice | null>(null);
+  const tutorial: TutorialTopic | null =
+    game.config.tutorials && game.roleRevealed
+      ? !game.tutorialSeen.includes("intro")
+        ? "intro"
+        : (requestedTutorial ?? game.tutorialQueue?.[0] ?? null)
+      : null;
   const showRole = !game.roleRevealed && !panel && !recovery && !activeNotice;
-  const overlayOpen = !!(activeNotice || panel || showRole);
   const human = game.players[0],
     f = playerFinancials(game, human),
     actor = actingPlayer(game),
     current = game.players[game.current],
-    freedom = Math.max(0, (f.passive / Math.max(1, f.expenses)) * 100),
-    dream = dreams.find((d) => d.id === human.dream)!;
+    freedom = Math.max(0, (f.passive / Math.max(1, f.expenses)) * 100);
+  const showDiscount =
+    game.decision?.kind === "discount" &&
+    actor.human &&
+    !panel &&
+    !activeNotice &&
+    !tutorial &&
+    !showRole &&
+    !recovery;
+  const overlayOpen = !!(
+    activeNotice ||
+    panel ||
+    showRole ||
+    showDiscount ||
+    tutorial
+  );
   const notify = useCallback((message: string) => setToast(message), []);
+  const keepDiscountOpen = useCallback(() => {}, []);
+  const revealTutorialTarget = useCallback((selector: string) => {
+    if (selector === ".game-board") setMobileTab("board");
+    if (selector === ".decision-panel") setMobileTab("decision");
+  }, []);
+  const openPanel = useCallback(
+    (next: Panel, topic?: TutorialTopic) => {
+      if (next === "finances") setFinancialPlayerId("p0");
+      setPanel(next);
+      if (
+        topic &&
+        game.config.tutorials &&
+        !(game.tutorialSeen ?? []).includes(topic)
+      )
+        setTutorial(topic);
+    },
+    [game.config.tutorials, game.tutorialSeen],
+  );
   function sound() {
     if (!prefs.sound) return;
     try {
@@ -411,6 +484,15 @@ export default function App() {
     },
     [notify],
   );
+  const finishTutorial = useCallback(() => {
+    if (!tutorial) return;
+    dispatch({ type: "TUTORIAL", key: tutorial });
+    setTutorial(null);
+  }, [dispatch, tutorial]);
+  const disableTutorials = useCallback(() => {
+    dispatch({ type: "TUTORIAL_MODE", enabled: false });
+    setTutorial(null);
+  }, [dispatch]);
   const playAction = (a: GameAction) => {
     if (a.type !== "DRAFT") sound();
     dispatch(a);
@@ -460,7 +542,8 @@ export default function App() {
       game.phase === "finished" ||
       (panel && panel !== "gameover") ||
       paused ||
-      recovery
+      recovery ||
+      tutorial
     )
       return;
     const id = setTimeout(
@@ -491,7 +574,7 @@ export default function App() {
       clearTimeout(id);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [game, actor.human, panel, paused, recovery, notify]);
+  }, [game, actor.human, panel, paused, recovery, notify, tutorial]);
   useEffect(() => {
     if (game.phase !== "finished") {
       shownResults.current = false;
@@ -558,6 +641,15 @@ export default function App() {
             <button
               className="nav-link"
               onClick={() => {
+                setPanel("market");
+                setMenu(false);
+              }}
+            >
+              Market <TrendingUp size={13} />
+            </button>
+            <button
+              className="nav-link"
+              onClick={() => {
                 setPanel("help");
                 setMenu(false);
               }}
@@ -572,6 +664,15 @@ export default function App() {
               }}
             >
               Wiki <BookOpen size={13} />
+            </button>
+            <button
+              className="nav-link"
+              onClick={() => {
+                setPanel("rulebook");
+                setMenu(false);
+              }}
+            >
+              Rulebook <BookOpen size={13} />
             </button>
             <span className="local-status">
               <span /> LOCAL PLAYTEST
@@ -612,7 +713,9 @@ export default function App() {
         </div>
       </header>
       <main className="page-shell" inert={overlayOpen}>
-        <EconomyBanner game={game} onOpen={() => setPanel("economy")} />
+        {!game.marketState && (
+          <EconomyBanner game={game} onOpen={() => setPanel("economy")} />
+        )}
         {human.eliminated && game.phase !== "finished" && (
           <div className="spectator-banner" role="status">
             <div>
@@ -716,7 +819,7 @@ export default function App() {
           </div>
           <button
             className="financial-link"
-            onClick={() => setPanel("finances")}
+            onClick={() => openPanel("finances", "portfolio")}
             aria-label="Open financial statement"
           >
             <ArrowUpRight size={22} />
@@ -740,83 +843,186 @@ export default function App() {
           ))}
         </div>
         <div className={`play-layout mobile-${mobileTab}`}>
-          <section className="board-panel">
-            <div className="section-heading">
-              <div>
-                <span className="section-kicker">YOUR BOARD, YOUR JOURNEY</span>
-                <h2>
-                  The road to <em>more.</em>
-                </h2>
-              </div>
-              <div className="round-badge">
-                <span /> Round{" "}
-                {Math.min(game.round, game.config.roundLimit || game.round)}
-                {game.config.roundLimit ? ` / ${game.config.roundLimit}` : ""}
-                <span className="round-separator">/</span>
-                {human.stage === "rat" ? "Rat Race" : "Fast Track"}
-              </div>
-            </div>
-            <Board game={game} />
-            <div className="board-legend">
-              <span>
-                <i className="legend-dot opportunity" />
-                Opportunity
-              </span>
-              <span>
-                <i className="legend-dot market" />
-                The market
-              </span>
-              <span>
-                <i className="legend-dot expense" />
-                Life happens
-              </span>
-              <span>
-                <i className="legend-dot payday" />
-                Payday
-              </span>
-              <span className="legend-dream">
-                <Star size={12} />
-                Your dream awaits
-              </span>
-            </div>
-            <div className="freedom-card">
-              <div className="freedom-icon">
-                <Flag size={23} />
-              </div>
-              <div className="freedom-copy">
+          <div className="board-column">
+            <section className="board-panel">
+              <div className="section-heading">
                 <div>
-                  <strong>
-                    {human.stage === "fast"
-                      ? "You’re on the Fast Track."
-                      : "Your ticket out of the Rat Race"}
-                  </strong>
-                  <span>{Math.round(freedom)}%</span>
+                  <span className="section-kicker">
+                    YOUR BOARD, YOUR JOURNEY
+                  </span>
+                  <h2>
+                    The road to <em>more.</em>
+                  </h2>
                 </div>
-                <p>
-                  {human.stage === "fast"
-                    ? `${money(Math.max(0, f.passive - human.entryIncome))} / ${money(game.config.incomeGoal)} additional passive income`
-                    : `${money(f.passive)} passive income / ${money(f.expenses)} monthly expenses`}
-                </p>
-                <div
-                  className="progress-track"
-                  role="progressbar"
-                  aria-label="Progress toward financial freedom"
-                  aria-valuenow={Math.min(100, Math.round(freedom))}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div style={{ width: `${Math.min(100, freedom)}%` }} />
+                <div className="round-controls">
+                  <TrendBadge game={game} />
+                  <div className="round-badge">
+                    <span /> Round{" "}
+                    {Math.min(game.round, game.config.roundLimit || game.round)}
+                    {game.config.roundLimit
+                      ? ` / ${game.config.roundLimit}`
+                      : ""}
+                    <span className="round-separator">/</span>
+                    {human.stage === "rat" ? "Rat Race" : "Fast Track"}
+                  </div>
                 </div>
               </div>
-              <button
-                className="icon-button"
-                aria-label="Learn about financial freedom"
-                onClick={() => setPanel("help")}
-              >
-                <CircleHelp size={18} />
-              </button>
+              <Board game={game} />
+              <div className="board-legend">
+                <span>
+                  <i className="legend-dot opportunity" />
+                  Opportunity
+                </span>
+                <span>
+                  <i className="legend-dot market" />
+                  The market
+                </span>
+                <span>
+                  <i className="legend-dot expense" />
+                  Life happens
+                </span>
+                <span>
+                  <i className="legend-dot payday" />
+                  Payday
+                </span>
+                <span className="legend-dream">
+                  <Star size={12} />
+                  Your dream awaits
+                </span>
+              </div>
+              <div className="freedom-card">
+                <div className="freedom-icon">
+                  <Flag size={23} />
+                </div>
+                <div className="freedom-copy">
+                  <div>
+                    <strong>
+                      {human.stage === "fast"
+                        ? "You’re on the Fast Track."
+                        : "Your ticket out of the Rat Race"}
+                    </strong>
+                    <span>{Math.round(freedom)}%</span>
+                  </div>
+                  <p>
+                    {human.stage === "fast"
+                      ? `${money(Math.max(0, f.passive - human.entryIncome))} / ${money(game.config.incomeGoal)} additional passive income`
+                      : `${money(f.passive)} passive income / ${money(f.expenses)} monthly expenses`}
+                  </p>
+                  <div
+                    className="progress-track"
+                    role="progressbar"
+                    aria-label="Progress toward financial freedom"
+                    aria-valuenow={Math.min(100, Math.round(freedom))}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div style={{ width: `${Math.min(100, freedom)}%` }} />
+                  </div>
+                </div>
+                <button
+                  className="icon-button"
+                  aria-label="Learn about financial freedom"
+                  onClick={() => setPanel("help")}
+                >
+                  <CircleHelp size={18} />
+                </button>
+              </div>
+            </section>
+            <div className="players-section">
+              <div className="minor-heading">
+                <h2>
+                  Around the table <span>{game.players.length} players</span>
+                </h2>
+                <button
+                  className="text-button"
+                  aria-label={paused ? "Resume NPC play" : "Pause NPC play"}
+                  onClick={() => setPaused(!paused)}
+                >
+                  {paused ? <Play size={13} /> : <Pause size={13} />}{" "}
+                  {paused ? "Resume" : "Pause"}
+                </button>
+              </div>
+              <div className="player-cards">
+                {game.players.map((p) => {
+                  const f = playerFinancials(game, p),
+                    active = p.id === current.id;
+                  return (
+                    <button
+                      type="button"
+                      className={`player-card ${active ? "current" : ""} ${p.eliminated ? "eliminated" : ""}`}
+                      key={p.id}
+                      aria-label={
+                        p.human
+                          ? "View your finances"
+                          : `View ${p.name}’s finances`
+                      }
+                      onClick={() => {
+                        setFinancialPlayerId(p.id);
+                        setPanel("finances");
+                      }}
+                    >
+                      <div className="player-top">
+                        <Avatar player={p} size={42} />
+                        <div>
+                          <strong>
+                            {p.name}
+                            {p.human && <span className="you-label"> YOU</span>}
+                          </strong>
+                          <small>
+                            {p.human
+                              ? professions.find((pr) => pr.id === p.profession)
+                                  ?.name
+                              : profileNames[p.profile]}
+                          </small>
+                        </div>
+                        {active && !p.eliminated && (
+                          <span className="active-player-dot" />
+                        )}
+                      </div>
+                      <div className="player-numbers">
+                        <span>
+                          Cash <strong>{money(f.cash, true)}</strong>
+                        </span>
+                        <span>
+                          Passive{" "}
+                          <strong>
+                            {money(f.passive, true)}
+                            <small>/mo</small>
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="player-progress">
+                        <span
+                          style={{
+                            width: `${Math.min(100, Math.max(0, (f.passive / Math.max(1, f.expenses)) * 100))}%`,
+                            background: p.color,
+                          }}
+                        />
+                      </div>
+                      <div className="player-bottom">
+                        <span>
+                          {p.eliminated
+                            ? "Out of the game"
+                            : p.stage === "fast"
+                              ? "Fast Track ↗"
+                              : "Rat Race"}
+                        </span>
+                        <span>
+                          {p.skip
+                            ? `${p.skip} turns recovering`
+                            : p.human
+                              ? "Your next chapter"
+                              : p.charity
+                                ? "Giving back ♥"
+                                : `${p.assets.length} investment${p.assets.length === 1 ? "" : "s"}`}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </section>
+          </div>
           <aside className="decision-column">
             <div className="decision-panel">
               <div className="turn-heading">
@@ -850,148 +1056,49 @@ export default function App() {
                 key={`${game.current}-${game.round}-${game.decision?.kind ?? game.phase}-${game.decision?.kind === "opportunity" ? (game.decision.card ?? "deck") : ""}-${game.decision?.kind === "market" ? game.decision.responder : ""}`}
                 game={game}
                 dispatch={playAction}
-                onFinances={() =>
-                  setPanel(
+                onFinances={() => {
+                  const next =
                     game.phase === "finished"
                       ? "results"
                       : human.eliminated
                         ? "gameover"
-                        : "finances",
-                  )
-                }
+                        : "finances";
+                  if (next === "finances") openPanel(next, "portfolio");
+                  else setPanel(next);
+                }}
               />
             </div>
-            {!game.tutorialDone && !game.pending && !human.eliminated && (
-              <FirstTurn onDismiss={() => dispatch({ type: "TUTORIAL" })} />
-            )}
-            <button className="dream-mini" onClick={() => setPanel("finances")}>
-              <span className="dream-mini-icon">
-                <Star size={20} />
-              </span>
-              <div>
-                <span>YOUR REASON WHY</span>
-                <strong>{dream.name}</strong>
-              </div>
-              <ArrowUpRight size={17} />
-            </button>
+            <MarketChanges
+              game={game}
+              compact
+              onOpen={() => setPanel("market")}
+            />
+            <div className="activity-section">
+              <MarketChanges game={game} onOpen={() => setPanel("market")} />
+            </div>
           </aside>
           <div className="mobile-finances">
-            <Finances game={game} dispatch={playAction} />
+            <Finances
+              game={game}
+              dispatch={playAction}
+              onTabChange={(tab) => {
+                const topic =
+                  tab === "debt"
+                    ? "debt"
+                    : tab === "assets"
+                      ? "portfolio"
+                      : null;
+                if (
+                  topic &&
+                  game.config.tutorials &&
+                  !(game.tutorialSeen ?? []).includes(topic)
+                )
+                  setTutorial(topic);
+              }}
+            />
           </div>
         </div>
-        <section className="bottom-layout">
-          <div className="players-section">
-            <div className="minor-heading">
-              <h2>
-                Around the table <span>{game.players.length} players</span>
-              </h2>
-              <button
-                className="text-button"
-                aria-label={paused ? "Resume NPC play" : "Pause NPC play"}
-                onClick={() => setPaused(!paused)}
-              >
-                {paused ? <Play size={13} /> : <Pause size={13} />}{" "}
-                {paused ? "Resume" : "Pause"}
-              </button>
-            </div>
-            <div className="player-cards">
-              {game.players.map((p) => {
-                const f = playerFinancials(game, p),
-                  active = p.id === current.id;
-                return (
-                  <div
-                    className={`player-card ${active ? "current" : ""} ${p.eliminated ? "eliminated" : ""}`}
-                    key={p.id}
-                  >
-                    <div className="player-top">
-                      <Avatar player={p} size={42} />
-                      <div>
-                        <strong>
-                          {p.name}
-                          {p.human && <span className="you-label"> YOU</span>}
-                        </strong>
-                        <small>
-                          {p.human
-                            ? professions.find((pr) => pr.id === p.profession)
-                                ?.name
-                            : profileNames[p.profile]}
-                        </small>
-                      </div>
-                      {active && !p.eliminated && (
-                        <span className="active-player-dot" />
-                      )}
-                    </div>
-                    <div className="player-numbers">
-                      <span>
-                        Cash <strong>{money(f.cash, true)}</strong>
-                      </span>
-                      <span>
-                        Passive{" "}
-                        <strong>
-                          {money(f.passive, true)}
-                          <small>/mo</small>
-                        </strong>
-                      </span>
-                    </div>
-                    <div className="player-progress">
-                      <span
-                        style={{
-                          width: `${Math.min(100, Math.max(0, (f.passive / Math.max(1, f.expenses)) * 100))}%`,
-                          background: p.color,
-                        }}
-                      />
-                    </div>
-                    <div className="player-bottom">
-                      <span>
-                        {p.eliminated
-                          ? "Out of the game"
-                          : p.stage === "fast"
-                            ? "Fast Track ↗"
-                            : "Rat Race"}
-                      </span>
-                      <span>
-                        {p.skip
-                          ? `${p.skip} turns recovering`
-                          : p.human
-                            ? "Your next chapter"
-                            : p.charity
-                              ? "Giving back ♥"
-                              : `${p.assets.length} investment${p.assets.length === 1 ? "" : "s"}`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="activity-section">
-            <div className="minor-heading">
-              <h2>The latest moves</h2>
-              <span className="live-dot">LIVE</span>
-            </div>
-            <div className="activity-list" aria-live="polite">
-              {game.log.slice(0, 3).map((e) => (
-                <div className="activity-item" key={e.id}>
-                  <span className={`activity-icon ${e.tone}`}>
-                    {e.tone === "positive" ? (
-                      <ArrowDownLeft size={15} />
-                    ) : e.tone === "negative" ? (
-                      <ArrowUpRight size={15} />
-                    ) : (
-                      <ChevronRight size={15} />
-                    )}
-                  </span>
-                  <div>
-                    <p>
-                      <strong>{e.player}</strong> {e.text}
-                    </p>
-                    <small>Round {e.round}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+
         {latest && (
           <div className="receipt-bar">
             <ShieldCheck size={16} />
@@ -1001,7 +1108,7 @@ export default function App() {
             </span>
             <button
               className="text-button"
-              onClick={() => setPanel("finances")}
+              onClick={() => openPanel("finances", "portfolio")}
             >
               View statement <ArrowRight size={13} />
             </button>
@@ -1032,19 +1139,23 @@ export default function App() {
                   : "MAKE IT YOURS"
           }
           title={
-            (
-              {
-                new: "A new chapter",
-                finances: "A clearer financial picture",
-                saves: "Pick up where you left off",
-                settings: "Your kind of game",
-                help: "A little guidance goes a long way",
-                results: "Look at what you built",
-                gameover: "Your game-over overview",
-                economy: "The city economy",
-                wiki: "Game wiki",
-              } as const
-            )[panel]
+            panel === "finances" && financialPlayerId !== "p0"
+              ? `${game.players.find((p) => p.id === financialPlayerId)?.name ?? "Player"}’s financial statement`
+              : (
+                  {
+                    new: "A new chapter",
+                    finances: "A clearer financial picture",
+                    saves: "Pick up where you left off",
+                    settings: "Your kind of game",
+                    help: "A little guidance goes a long way",
+                    results: "Look at what you built",
+                    gameover: "Your game-over overview",
+                    economy: "The city economy",
+                    wiki: "Game wiki",
+                    market: "The city markets",
+                    rulebook: "Rulebook",
+                  } as const
+                )[panel]
           }
           onClose={close}
           className={
@@ -1059,7 +1170,9 @@ export default function App() {
             panel === "finances" ||
             panel === "results" ||
             panel === "gameover" ||
-            panel === "economy"
+            panel === "economy" ||
+            panel === "market" ||
+            panel === "rulebook"
           }
         >
           {panel === "new" ? (
@@ -1092,14 +1205,36 @@ export default function App() {
             </>
           ) : panel === "finances" || panel === "results" ? (
             <Finances
-              key={panel}
+              key={`${panel}-${financialPlayerId}`}
               game={game}
+              playerId={panel === "finances" ? financialPlayerId : undefined}
               dispatch={(a) => {
                 playAction(a);
-                if (game.config.accounting === "manual" && a.type !== "SPEED") {
+                if (
+                  game.config.accounting === "manual" &&
+                  (["REPAY", "BORROW", "SELL"].includes(a.type) ||
+                    (a.type === "SELL_ANYTIME" &&
+                      human.assets.find((asset) => asset.id === a.assetId)
+                        ?.category === "stock"))
+                ) {
                   setPanel(null);
                   setMobileTab("decision");
                 }
+              }}
+              onTabChange={(tab) => {
+                const topic =
+                  tab === "debt"
+                    ? "debt"
+                    : tab === "assets"
+                      ? "portfolio"
+                      : null;
+                if (
+                  financialPlayerId === "p0" &&
+                  topic &&
+                  game.config.tutorials &&
+                  !(game.tutorialSeen ?? []).includes(topic)
+                )
+                  setTutorial(topic);
               }}
               results={panel === "results"}
             />
@@ -1117,7 +1252,15 @@ export default function App() {
               onNew={() => setPanel("new")}
             />
           ) : panel === "wiki" ? (
-            <Wiki game={game} />
+            <Suspense fallback={<p role="status">Opening wiki…</p>}>
+              <Wiki game={game} />
+            </Suspense>
+          ) : panel === "market" ? (
+            <Market game={game} />
+          ) : panel === "rulebook" ? (
+            <Suspense fallback={<p role="status">Opening rulebook…</p>}>
+              <Rulebook />
+            </Suspense>
           ) : panel === "economy" ? (
             <EconomicEvents game={game} />
           ) : panel === "help" ? (
@@ -1147,6 +1290,27 @@ export default function App() {
                       notificationsOnlyMine: e.target.checked,
                     })
                   }
+                />
+              </label>
+              <label className="toggle-row">
+                <span>
+                  <BookOpen size={19} />
+                  <span>
+                    <strong>Interactive tutorial</strong>
+                    <small>
+                      Explain the board and first-time features as you meet them
+                    </small>
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={game.config.tutorials}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    dispatch({ type: "TUTORIAL_MODE", enabled });
+                    if (!enabled) setTutorial(null);
+                  }}
                 />
               </label>
               <label className="toggle-row">
@@ -1232,7 +1396,11 @@ export default function App() {
               <dl className="settings-summary">
                 <div>
                   <dt>Bank interest</dt>
-                  <dd>{game.config.annualRate}% annually</dd>
+                  <dd>
+                    {game.marketState
+                      ? "2% monthly · purchase loans 1%"
+                      : `${game.config.annualRate}% annually`}
+                  </dd>
                 </div>
                 <div>
                   <dt>NPC difficulty</dt>
@@ -1270,13 +1438,47 @@ export default function App() {
           onDismiss={() => setActiveNotice(null)}
         />
       )}
+      {showDiscount && (
+        <Modal
+          title={
+            game.pending
+              ? game.pending.completeDiscount
+                ? "Record your discount purchase"
+                : "Record your financing"
+              : "Discounted market offer"
+          }
+          eyebrow="A SHARED OPPORTUNITY"
+          className="shared-discount-modal"
+          dismissible={false}
+          onClose={keepDiscountOpen}
+        >
+          <DecisionPanel
+            key={`discount-${game.decision!.kind === "discount" ? game.decision!.card : ""}-${game.round}`}
+            game={game}
+            dispatch={playAction}
+            onFinances={() => openPanel("finances", "portfolio")}
+          />
+        </Modal>
+      )}
       {showRole && (
         <RoleReveal
           game={game}
           onContinue={() => dispatch({ type: "REVEAL_ROLE" })}
         />
       )}
-      <div inert={showRole || !!activeNotice}>
+      {tutorial && game.config.tutorials && (
+        <TutorialGuide
+          key={tutorial}
+          topic={tutorial}
+          onFinish={finishTutorial}
+          onDisable={disableTutorials}
+          onRevealTarget={revealTutorialTarget}
+        />
+      )}
+      <div
+        inert={showRole || !!activeNotice || showDiscount || !!tutorial}
+        style={showDiscount ? { visibility: "hidden" } : undefined}
+      >
         <Notifications
           notices={game.notices.filter(
             (n) => n.kind !== "risk" || game.config.accounting === "auto",
@@ -1286,9 +1488,6 @@ export default function App() {
           onClear={() => dispatch({ type: "CLEAR_NOTIFICATIONS" })}
           playerId={human.id}
           onlyMine={prefs.notificationsOnlyMine}
-          onOnlyMineChange={(value) =>
-            setPrefs({ ...prefs, notificationsOnlyMine: value })
-          }
         />
       </div>
       {toast && (

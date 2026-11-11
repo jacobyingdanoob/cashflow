@@ -1,8 +1,8 @@
+import { createLegacyGame as createGame } from "../../tests/legacyGame";
 import { describe, it, expect } from "vitest";
 import {
   actingPlayer,
   assetFromDeal,
-  createGame,
   playerFinancials,
   reduceGame,
   salePrice,

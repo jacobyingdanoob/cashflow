@@ -9,6 +9,7 @@ export default function Modal({
   eyebrow = "MAKE IT YOURS",
   className = "",
   hidden = false,
+  dismissible = true,
 }: {
   title: string;
   children: React.ReactNode;
@@ -18,22 +19,27 @@ export default function Modal({
   eyebrow?: string;
   className?: string;
   hidden?: boolean;
+  dismissible?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Capture before the render commits: making the page inert can blur its opener.
+  const returnFocus = useRef(document.activeElement as HTMLElement);
   useEffect(() => {
     if (hidden) return;
-    const last = document.activeElement as HTMLElement;
+    const last = returnFocus.current;
     const old = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const node = ref.current;
     node?.focus();
     function key(e: KeyboardEvent) {
       if (e.defaultPrevented) return;
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && dismissible) onClose();
       if (e.key === "Tab") {
-        const items = node?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]',
-        );
+        const items = Array.from(
+          node?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex="0"]',
+          ) ?? [],
+        ).filter((item) => item.getClientRects().length > 0);
         if (!items?.length) return;
         const first = items[0],
           last = items[items.length - 1];
@@ -58,14 +64,15 @@ export default function Modal({
       document.body.style.overflow = old;
       last?.focus();
     };
-  }, [onClose, hidden]);
+  }, [onClose, hidden, dismissible]);
   return (
     <div
       className="modal-backdrop"
       style={hidden ? { display: "none" } : undefined}
       inert={hidden}
       onMouseDown={(e) => {
-        if (dismissOnBackdrop && e.target === e.currentTarget) onClose();
+        if (dismissible && dismissOnBackdrop && e.target === e.currentTarget)
+          onClose();
       }}
     >
       <div
@@ -81,13 +88,15 @@ export default function Modal({
             <span className="eyebrow">{eyebrow}</span>
             <h2>{title}</h2>
           </div>
-          <button
-            className="icon-button"
-            aria-label="Close dialog"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
+          {dismissible && (
+            <button
+              className="icon-button"
+              aria-label="Close dialog"
+              onClick={onClose}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
         {children}
       </div>

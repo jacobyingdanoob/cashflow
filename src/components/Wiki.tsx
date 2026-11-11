@@ -33,6 +33,15 @@ import {
 } from "../game/wiki";
 import type { GameState, Profession } from "../game/types";
 import CardSource from "./CardSource";
+import {
+  marketShocks,
+  marketIndex,
+  purchaseQuote,
+  marketLabels,
+} from "../game/market";
+import { marketTrends, trendRate, cycleRange } from "../game/trends";
+import { TrendDetails } from "./MarketTrend";
+import type { AssetCategory } from "../game/types";
 
 const icons = {
   roles: Users,
@@ -91,6 +100,12 @@ function entryStatus(entry: WikiEntry, game: GameState) {
   if (entry.kind === "dreams" && entry.item.id === game.players[0].dream)
     return "Your dream";
   if (entry.kind === "cycles") {
+    if (game.marketState)
+      return game.marketState.dynamics?.active?.card === entry.item.id
+        ? "Active market trend"
+        : game.config.economicCycles
+          ? "Every 5 rounds"
+          : "Trends off in this match";
     const active = game.economy.active.find((c) => c.card === entry.item.id);
     return active
       ? `Active through round ${active.expires - 1}`
@@ -123,6 +138,18 @@ function summaryStats(entry: WikiEntry, game: GameState): [string, string][] {
         ["Financing debt", amount(entry.item.mortgage)],
       ];
     case "market":
+      if (game.marketState)
+        return [
+          [
+            "Price movement",
+            `${entry.item.multiplier >= 1 ? "+" : ""}${Math.round((entry.item.multiplier - 1) * 100)}%`,
+          ],
+          [
+            "Current index",
+            `${(marketIndex(game, entry.item.category) * 100).toFixed(2)}%`,
+          ],
+          ["Duration", "Until next market change"],
+        ];
       return entry.item.effect === "split"
         ? [
             ["Share count", "×2"],
@@ -241,8 +268,8 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
           </div>
           <p>
             Choose a starting difficulty in New game to receive a random role
-            from its five-role pool. NPC decision difficulty is a separate
-            setting.
+            from its five-role pool. Everyone starts with that role and
+            identical finances. NPC decision difficulty is a separate setting.
           </p>
         </>
       );
@@ -292,14 +319,27 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
               ? "Amounts are per share; multiply cash needed and recurring income by the share count. A zero recurring income means the stock does not help monthly passive-income progress unless another effect changes its income."
               : "The net passive income above already includes financing costs. Those costs are not charged again in household expenses. Partial financing repayment lowers the payment proportionally and raises net passive income."}
           </p>
+          {game.marketState && card.mortgage > 0 && (
+            <p>
+              These are the authored baseline figures. Your purchase uses 10%,
+              15%, 20%, 25%, then 35% down across successive financed Type 1
+              acquisitions. Mortgage payments and net income recalculate
+              proportionally. An optional 1% monthly purchase loan is separate
+              from ordinary 2% monthly bank loans; all new debt must fit the 55%
+              DTI limit, excluding starting role debt.
+            </p>
+          )}
           <h4>Choices and restrictions</h4>
           <p>
             Buy if you can fund the cash needed, or pass.{" "}
             {card.transferable
               ? "This opportunity can also be offered to an eligible NPC for a negotiated fee; the NPC must accept and buy immediately."
               : "This opportunity cannot be transferred to another player."}{" "}
-            Owned assets can be sold only during a matching market offer or
-            through distress recovery.
+            Sell stocks anytime from Portfolio. Businesses take 1–3 rounds to
+            sell with a 5% quick-sale discount; real estate takes 1–3 rounds
+            with a 15% discount. Income continues until closing. Matching
+            market-space sales skip the wait and quick-sale discount. Ordinary
+            fees, tax and included mortgage settlement still apply.
           </p>
           <div className="wiki-advice">
             <section>
@@ -313,9 +353,9 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
             <section>
               <h4>What can change</h4>
               <p>
-                Economic cycles can affect entry prices, asset values, operating
-                income and financing. The figures here are the baseline, before
-                those effects.
+                {game.marketState
+                  ? `Market landings reprice this category until another market event changes it. These are baseline card figures. The acquisition fee at baseline is ${amount(purchaseQuote(game, card).fee)}. Property rent stays fixed; stock and business operating income follow one quarter of the price-index change.`
+                  : "Economic cycles can affect entry prices, asset values, operating income and financing. These figures are the baseline before those effects."}
               </p>
             </section>
           </div>
@@ -340,13 +380,15 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
           </p>
           <h4>What happens</h4>
           <p>
-            {card.effect === "offer"
-              ? card.sharePrice !== undefined
-                ? `The baseline buyer quote is ${amount(card.sharePrice)} per share, multiplied by shares held. Active stock-price conditions apply once.`
-                : `The buyer offers ${Math.round(card.multiplier * 100)}% of the holding’s reference value, adjusted for active market-price conditions. Remaining investment financing is deducted from sale proceeds.`
-              : card.effect === "split"
-                ? "Each eligible stock holding doubles its share count and halves its unit price. Total investment value and monthly income stay unchanged; the split itself adds no cash."
-                : `Each eligible shareholder receives ${amount(card.amount)} per share as a one-time cash distribution. This does not change recurring monthly income.`}
+            {game.marketState
+              ? `This event multiplies the current ${card.category} index by ${card.multiplier.toFixed(2)}. The resulting price persists, and every affected portfolio is revalued. Sale calculations include applicable acquisition cost basis, sale fees, early mortgage payoff costs and capital-gains tax; see the Rulebook for the full formula.`
+              : card.effect === "offer"
+                ? card.sharePrice !== undefined
+                  ? `The baseline buyer quote is ${amount(card.sharePrice)} per share, multiplied by shares held. Active stock-price conditions apply once.`
+                  : `The buyer offers ${Math.round(card.multiplier * 100)}% of the holding’s reference value, adjusted for active market-price conditions. Remaining investment financing is deducted from sale proceeds.`
+                : card.effect === "split"
+                  ? "Each eligible stock holding doubles its share count and halves its unit price. Total investment value and monthly income stay unchanged; the split itself adds no cash."
+                  : `Each eligible shareholder receives ${amount(card.amount)} per share as a one-time cash distribution. This does not change recurring monthly income.`}
           </p>
           <h4>Your choice</h4>
           <p>
@@ -384,6 +426,19 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
         </>
       );
     case "cycles": {
+      const trend =
+        game.marketState && marketTrends.find((c) => c.id === entry.item.id);
+      if (trend)
+        return (
+          <>
+            <h4>Three-round market trend</h4>
+            <TrendDetails card={trend} />
+            <p>
+              Drawn every five rounds, starting in round 5. This card changes
+              prices once per round for three rounds, with no reset afterward.
+            </p>
+          </>
+        );
       const card = entry.item;
       const changes: [string, string][] = [];
       const change = (n: number) =>
@@ -478,6 +533,33 @@ function Details({ entry, game }: { entry: WikiEntry; game: GameState }) {
 }
 
 export default function Wiki({ game }: { game: GameState }) {
+  const entries = useMemo(
+    () =>
+      game.marketState
+        ? [
+            ...wikiEntries.filter(
+              (e) => e.kind !== "cycles" && e.kind !== "market",
+            ),
+            ...marketShocks.map((item): WikiEntry => ({
+              kind: "market",
+              item,
+            })),
+            ...marketTrends.map((item): WikiEntry => ({
+              kind: "cycles",
+              item: {
+                ...item,
+                affected: Object.keys(item.rates)
+                  .map(
+                    (c) =>
+                      `${marketLabels[c as AssetCategory]}: ${trendRate(cycleRange(item, c as AssetCategory)!)}`,
+                  )
+                  .join("; "),
+              },
+            })),
+          ]
+        : wikiEntries,
+    [!!game.marketState],
+  );
   const [category, setCategory] = useState<WikiCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("all");
@@ -487,14 +569,14 @@ export default function Wiki({ game }: { game: GameState }) {
   const entryHeading = useRef<HTMLHeadingElement>(null);
   const filtered = useMemo(() => {
     const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    return wikiEntries.filter(
+    return entries.filter(
       (entry) =>
         (category === "all" || entry.kind === category) &&
         (source === "all" ||
           isAdaptedEntry(entry) === (source === "adapted")) &&
         words.every((word) => wikiSearchText(entry).includes(word)),
     );
-  }, [category, query, source]);
+  }, [category, query, source, entries]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const start = page * PAGE_SIZE;
   useEffect(() => {
@@ -525,7 +607,7 @@ export default function Wiki({ game }: { game: GameState }) {
           <h3>Know your next move.</h3>
           <p>
             Explore every role, card and event. Amounts are baseline USD before
-            sandbox settings or active economic cycles.
+            sandbox settings or current market conditions.
           </p>
         </div>
       </div>
@@ -581,24 +663,30 @@ export default function Wiki({ game }: { game: GameState }) {
           >
             <BookOpen size={16} />
             <span>All entries</span>
-            <small>{wikiEntries.length}</small>
+            <small>{entries.length}</small>
           </button>
-          {wikiCategories.map((c) => {
-            const Icon = icons[c.id];
-            return (
-              <button
-                key={c.id}
-                aria-pressed={category === c.id}
-                onClick={() => changeCategory(c.id)}
-              >
-                <Icon size={16} />
-                <span>{c.name}</span>
-                <small>
-                  {wikiEntries.filter((entry) => entry.kind === c.id).length}
-                </small>
-              </button>
-            );
-          })}
+          {wikiCategories
+            .map((c) =>
+              c.id === "cycles" && game.marketState
+                ? { ...c, name: "Economic trends" }
+                : c,
+            )
+            .map((c) => {
+              const Icon = icons[c.id];
+              return (
+                <button
+                  key={c.id}
+                  aria-pressed={category === c.id}
+                  onClick={() => changeCategory(c.id)}
+                >
+                  <Icon size={16} />
+                  <span>{c.name}</span>
+                  <small>
+                    {entries.filter((entry) => entry.kind === c.id).length}
+                  </small>
+                </button>
+              );
+            })}
           <p>
             Adapted cards are {game.config.adaptedCards ? "enabled" : "off"} in
             this match. All remain available to read here.
@@ -636,13 +724,17 @@ export default function Wiki({ game }: { game: GameState }) {
                   <h3>
                     {category === "all"
                       ? "The complete collection"
-                      : wikiCategories.find((c) => c.id === category)!.name}
+                      : category === "cycles" && game.marketState
+                        ? "Economic trends"
+                        : wikiCategories.find((c) => c.id === category)!.name}
                   </h3>
                   <p>
                     {category === "all"
                       ? "Find a familiar card, or discover what is possible."
-                      : wikiCategories.find((c) => c.id === category)!
-                          .description}
+                      : category === "cycles" && game.marketState
+                        ? "Three-round market trends, drawn every five rounds from round 5."
+                        : wikiCategories.find((c) => c.id === category)!
+                            .description}
                   </p>
                 </div>
                 <span role="status">

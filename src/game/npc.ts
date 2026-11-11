@@ -1,4 +1,8 @@
-import { deals, dollars, markets } from "./content";
+import { deals, dollars, marketById } from "./content";
+import { chooseModernNpc } from "./npcModern";
+import { voluntarySaleQuote } from "./sales";
+import { lendingSnapshot, debtCapacity } from "./lending";
+import { type1PurchaseCount } from "./market";
 import {
   actingPlayer,
   assetFromDeal,
@@ -8,6 +12,7 @@ import {
   playerFinancials,
   reduceGame,
   marketSalePrice,
+  marketSaleQuote,
 } from "./engine";
 import {
   assetIncome,
@@ -23,20 +28,35 @@ export function npcView(s: GameState): NpcDecisionView {
   const p = actingPlayer(s),
     d = s.decision;
   const original =
-    d?.kind === "opportunity" ? deals.find((c) => c.id === d.card) : undefined;
+    d?.kind === "opportunity" || d?.kind === "discount"
+      ? deals.find((c) => c.id === d.card)
+      : undefined;
   const offered = original ? effectiveDeal(s, original) : undefined;
   return {
+    lending: lendingSnapshot(s, p),
+    voluntarySales: Object.fromEntries(
+      p.assets.map((a) => [a.id, voluntarySaleQuote(s, a)]),
+    ),
+    assetIncomes: Object.fromEntries(
+      p.assets.map((a) => [a.id, assetIncome(s, a)]),
+    ),
+    canBorrow: p.id === s.players[s.current].id && !p.bankrupt,
+    modern: !!s.marketState,
+    round: s.round,
+    sales: s.marketState
+      ? Object.fromEntries(p.assets.map((a) => [a.id, marketSaleQuote(s, a)]))
+      : undefined,
     liquidityReserve: s.config.liquidityRisk ? requiredReserve(p) : 0,
     principalDue: installment(p, s.config.principalRate),
     distressValues: Object.fromEntries(
       p.assets.map((a) => [a.id, distressValue(s, a)]),
     ),
-    player: structuredClone(p),
+    player: { ...structuredClone(p), type1Purchases: type1PurchaseCount(s, p) },
     financials: playerFinancials(s, p),
     phase: s.phase,
     decision: structuredClone(d),
     deal:
-      d?.kind === "opportunity"
+      d?.kind === "opportunity" || d?.kind === "discount"
         ? offered
           ? {
               ...offered,
@@ -47,7 +67,7 @@ export function npcView(s: GameState): NpcDecisionView {
     market:
       d?.kind === "market"
         ? (() => {
-            const card = markets.find((c) => c.id === d.card)!;
+            const card = marketById(d.card)!;
             return {
               ...card,
               ...(card.sharePrice !== undefined
@@ -65,7 +85,7 @@ export function npcView(s: GameState): NpcDecisionView {
       d?.kind === "market"
         ? structuredClone(eligibleAssets(s, p, d.card)).map((a) => ({
             ...a,
-            cost: assetValue(s, a),
+            cost: s.marketState ? a.cost : assetValue(s, a),
             referenceValue: assetValue(s, a),
             income: assetIncome(s, a),
           }))
@@ -88,6 +108,33 @@ export function chooseNpc(v: NpcDecisionView): {
   action: GameAction;
   reason: string;
 } {
+  if (v.player.eliminated)
+    return { action: { type: "END" }, reason: "My game is over." };
+  if (
+    v.decision?.kind === "liquidity" ||
+    (v.decision?.kind === "insolvency" && v.player.cash < v.decision.amount)
+  ) {
+    const stock = v.player.assets.find(
+      (a) => a.category === "stock" && (v.voluntarySales?.[a.id]?.net ?? 0) > 0,
+    );
+    if (stock)
+      return {
+        action: {
+          type: "SELL_ANYTIME",
+          playerId: v.player.id,
+          assetId: stock.id,
+        },
+        reason: `Selling liquid shares at the current price to cover the immediate cash shortfall before considering a distress sale.`,
+      };
+  }
+  if (
+    v.modern &&
+    (v.phase === "end" ||
+      v.decision?.kind === "opportunity" ||
+      v.decision?.kind === "discount" ||
+      v.decision?.kind === "market")
+  )
+    return chooseModernNpc(v);
   const { player: p, financials: f, decision: d, config } = v;
   const reserveMonths =
     { cautious: 2, income: 0.8, bold: 0.25, diverse: 1.2 }[p.profile] *
@@ -180,7 +227,14 @@ export function chooseNpc(v: NpcDecisionView): {
     const loan = Math.ceil((d.amount - p.cash) / dollars(1000)) * dollars(1000);
     if (
       !p.bankrupt &&
-      f.flow - Math.round((loan * config.annualRate) / 1200) > 0
+      f.flow - Math.round(loan * (v.modern ? 0.02 : config.annualRate / 1200)) >
+        0 &&
+      (!v.modern ||
+        (v.lending &&
+          debtCapacity(
+            v.lending.service + Math.round(loan * v.lending.bankRate),
+            v.lending.income,
+          ).allowed))
     )
       return {
         action: { type: "BORROW", amount: loan },

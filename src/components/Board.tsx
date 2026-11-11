@@ -7,6 +7,7 @@ import {
   Sailboat,
   Sprout,
   Coffee,
+  FlaskConical,
 } from "lucide-react";
 import { dreams, innerBoard, fastTrackBoard } from "../game/content";
 import type { GameState, Player, Space } from "../game/types";
@@ -52,18 +53,34 @@ export function Avatar({
           cy="32"
           r="32"
           fill={
-            ["#deebe2", "#f4e6cf", "#e7e2ef", "#f3ded6", "#dceaf0", "#e6ebd7"][
-              i
-            ]
+            [
+              "#deebe2",
+              "#f4e6cf",
+              "#e7e2ef",
+              "#f3ded6",
+              "#dceaf0",
+              "#e6ebd7",
+              "#ebe0f0",
+              "#d8ecee",
+              "#f4decc",
+            ][i]
           }
         />
         <path d="M9 65c1-18 10-26 23-26s22 8 23 26" fill={player.color} />
         <path
           d="M26 37v9q6 7 12 0V36"
           fill={
-            ["#d4a37f", "#b87755", "#e6bda0", "#ad7355", "#d4a37f", "#956047"][
-              i
-            ]
+            [
+              "#d4a37f",
+              "#b87755",
+              "#e6bda0",
+              "#ad7355",
+              "#d4a37f",
+              "#956047",
+              "#9a674c",
+              "#ca976e",
+              "#b47753",
+            ][i]
           }
         />
         <ellipse
@@ -72,9 +89,17 @@ export function Avatar({
           rx="14"
           ry="17"
           fill={
-            ["#edc4a4", "#d89b73", "#f3d4b8", "#cd956f", "#e9bc96", "#bd855e"][
-              i
-            ]
+            [
+              "#edc4a4",
+              "#d89b73",
+              "#f3d4b8",
+              "#cd956f",
+              "#e9bc96",
+              "#bd855e",
+              "#be8967",
+              "#edc19a",
+              "#d89d75",
+            ][i]
           }
         />
         <path
@@ -84,9 +109,17 @@ export function Avatar({
               : "M17 32C7 12 24 5 33 7 51 5 53 24 46 36l-5-16c-10 5-17 1-18 0z"
           }
           fill={
-            ["#343d35", "#343331", "#695040", "#3c3533", "#604739", "#303730"][
-              i
-            ]
+            [
+              "#343d35",
+              "#343331",
+              "#695040",
+              "#3c3533",
+              "#604739",
+              "#303730",
+              "#2e2c30",
+              "#282f35",
+              "#704832",
+            ][i]
           }
         />
         <circle cx="27" cy="29" r="1.3" fill="#3d3630" />
@@ -312,6 +345,7 @@ export default function Board({ game }: { game: GameState }) {
     sail: Sailboat,
     leaf: Sprout,
     coffee: Coffee,
+    science: FlaskConical,
   };
   const dreamLabels: Record<string, string> = {
     coast: "COASTAL HOME",
@@ -322,6 +356,7 @@ export default function Board({ game }: { game: GameState }) {
     sailing: "OCEAN VOYAGE",
     farm: "LITTLE FARM",
     time: "A YEAR OFF",
+    research: "SCIENCE LAB",
   };
   function spaces(
     board: Space[],
@@ -462,18 +497,23 @@ export default function Board({ game }: { game: GameState }) {
                 v.stage === p.stage &&
                 v.position === p.position,
             );
-            const offset =
-              -(group.length - 1) * 9 +
-              group.findIndex((v) => v.id === p.id) * 18;
+            const index = group.findIndex((v) => v.id === p.id),
+              clustered = group.length > 4,
+              offset = clustered
+                ? ((index % 3) - 1) * 21
+                : -(group.length - 1) * 9 + index * 18,
+              offsetY = clustered ? Math.floor(index / 3) * 21 - 10 : 0;
             return (
               <g
                 key={p.id}
                 className="board-token"
-                style={{ transform: `translate(${x + offset}px,${y - 40}px)` }}
+                style={{
+                  transform: `translate(${x + offset}px,${y - 40 + offsetY}px)`,
+                }}
                 aria-label={`${p.name}'s token`}
               >
                 <circle
-                  r="13"
+                  r={clustered ? 10 : 13}
                   fill={p.color}
                   stroke="#fffdf5"
                   strokeWidth="3"

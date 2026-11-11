@@ -488,6 +488,15 @@
   color: #476b37;
   margin-top: 7px;
 }
+.coach-player-stats small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+}
+.coach-player-stats .coach-risk,
+.coach-player-stats .coach-risk strong {
+  color: #913e30;
+}
 .coach-tips {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -577,7 +586,7 @@
 .review-footnote {
   font-size: 10px;
   line-height: 1.9;
-  color: #6a7a5a;
+  color: #596f45;
   margin: 20px 0 0;
 }
 @media (max-width: 800px) {

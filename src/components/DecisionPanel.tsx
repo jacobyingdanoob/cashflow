@@ -21,7 +21,7 @@ import {
 import {
   deals,
   dreams,
-  markets,
+  marketById,
   EARLY_OPPORTUNITY_ROUNDS,
   EARLY_OPPORTUNITY_WEIGHT,
 } from "../game/content";
@@ -34,6 +34,7 @@ import {
   preciseMoney,
   playerFinancials,
   marketSalePrice,
+  marketSaleQuote,
 } from "../game/engine";
 import CardSource from "./CardSource";
 import AssetCashFlow from "./AssetCashFlow";
@@ -46,6 +47,12 @@ import {
   requiredReserve,
 } from "../game/economy";
 import type { GameAction, GameState } from "../game/types";
+import { opportunityType, purchaseQuote, marketIndex } from "../game/market";
+import {
+  borrowingQuote,
+  purchaseLending,
+  validLoanAmount,
+} from "../game/lending";
 const fieldLabels: Record<string, string> = {
   cash: "Cash on hand",
   assets: "Investment assets (current value)",
@@ -161,6 +168,9 @@ export default function DecisionPanel({
     f = playerFinancials(game, p),
     d = game.decision;
   const [shares, setShares] = useState(10),
+    [purchaseLoanEnabled, setPurchaseLoanEnabled] = useState(false),
+    [purchaseLoanDollars, setPurchaseLoanDollars] = useState(1000),
+    [outright, setOutright] = useState(false),
     [fee, setFee] = useState(100),
     [target, setTarget] = useState(1),
     [transfer, setTransfer] = useState(false),
@@ -376,18 +386,42 @@ export default function DecisionPanel({
         </button>
       </div>
     );
-  if (d?.kind === "opportunity" && d.card) {
+  if ((d?.kind === "opportunity" || d?.kind === "discount") && d.card) {
     const card = effectiveDeal(
         game,
         deals.find((c) => c.id === d.card)!,
       ),
       count = card.category === "stock" ? shares : 1,
-      previewAsset = assetFromDeal(card, "preview", count),
+      quote = purchaseQuote(game, card, count, outright, p),
+      previewAsset = assetFromDeal(quote.deal, "preview", count),
+      canPurchaseLoan =
+        !!game.marketState && opportunityType(card) === 1 && !outright,
+      loan =
+        canPurchaseLoan && purchaseLoanEnabled
+          ? Math.round(purchaseLoanDollars * 100)
+          : 0,
+      validLoan =
+        validLoanAmount(loan) &&
+        (!purchaseLoanEnabled || !canPurchaseLoan || loan > 0),
+      lending = purchaseLending(game, p, quote, loan),
       previewIncome = assetIncome(game, previewAsset),
-      cost = card.down * count,
-      short = Math.max(0, cost - p.cash);
+      cost = quote.cash,
+      short = Math.max(0, cost - p.cash),
+      normalLoan = Math.ceil(short / 100000) * 100000,
+      normalCapacity = borrowingQuote(game, p, normalLoan);
     return (
       <div className="decision-content deal-content">
+        {d.kind === "discount" && (
+          <div className="callout">
+            <strong>Shared discounted asset</strong>
+            <p>
+              One random asset for the whole table at the same current price.
+              Buy once or pass; {d.remaining.length} more{" "}
+              {d.remaining.length === 1 ? "player" : "players"} will respond
+              after you. Fees, debt and liquidity rules still apply.
+            </p>
+          </div>
+        )}
         <span className="card-category">
           <BriefcaseBusiness size={14} />
           {card.category === "property"
@@ -397,6 +431,12 @@ export default function DecisionPanel({
               : "BUSINESS OPPORTUNITY"}
         </span>
         <h3>{card.name}</h3>
+        {game.marketState && (
+          <p className="small muted">
+            Type {opportunityType(card)} · Current {card.category} index:{" "}
+            {(marketIndex(game, card.category) * 100).toFixed(2)}%
+          </p>
+        )}
         <p className="muted">{card.description}</p>
         <CardSource source={card.source} />
         <div className="deal-yield">
@@ -407,8 +447,8 @@ export default function DecisionPanel({
           </strong>
           <span>
             <TrendingUp size={14} />
-            {Math.round(((previewIncome * 12) / (card.down * count)) * 100)}%
-            annual cash-on-cash return
+            {Math.round(((previewIncome * 12) / cost) * 100)}% annual
+            cash-on-cash return
           </span>
         </div>
         {card.category === "stock" && (
@@ -424,60 +464,235 @@ export default function DecisionPanel({
             />
           </label>
         )}
-        <dl className="deal-details">
-          <div>
-            <dt>
-              {card.category === "stock" ? "Share purchase" : "Down payment"}
-            </dt>
-            <dd>{money(cost)}</dd>
+        {game.marketState && card.mortgage > 0 && (
+          <label className="toggle-row outright-toggle">
+            <span>Buy outright without financing</span>
+            <input
+              type="checkbox"
+              checked={outright}
+              onChange={(e) => setOutright(e.target.checked)}
+            />
+          </label>
+        )}
+        {canPurchaseLoan && (
+          <div className="purchase-loan-box">
+            <p className="small">
+              <b>
+                Financed purchase #{quote.tier}:{" "}
+                {Math.round(quote.downRate * 100)}% down
+              </b>{" "}
+              · {preciseMoney(quote.down)} plus {preciseMoney(quote.fee)}{" "}
+              acquisition fee.
+            </p>
+            <label className="toggle-row">
+              <span>Add a purchase loan · 1% monthly</span>
+              <input
+                type="checkbox"
+                checked={purchaseLoanEnabled}
+                disabled={p.bankrupt}
+                onChange={(e) => {
+                  setPurchaseLoanEnabled(e.target.checked);
+                  if (e.target.checked)
+                    setPurchaseLoanDollars(
+                      Math.max(
+                        1000,
+                        Math.ceil(
+                          Math.max(
+                            0,
+                            cost +
+                              (game.config.liquidityRisk
+                                ? lending.reserve
+                                : 0) -
+                              p.cash,
+                          ) /
+                            (game.config.liquidityRisk ? 0.9 : 1) /
+                            100000,
+                        ) * 1000,
+                      ),
+                    );
+                }}
+              />
+            </label>
+            {purchaseLoanEnabled && (
+              <label className="form-field">
+                Purchase loan amount ($)
+                <input
+                  aria-label="Purchase loan amount"
+                  type="number"
+                  min="1000"
+                  max="1000000"
+                  step="1000"
+                  value={purchaseLoanDollars}
+                  onChange={(e) =>
+                    setPurchaseLoanDollars(Number(e.target.value))
+                  }
+                />
+                <small>
+                  Separate from ordinary 2% monthly bank loans. Borrowed only
+                  when this purchase completes; repaying principal is optional.
+                </small>
+              </label>
+            )}
           </div>
-          {card.mortgage > 0 && (
-            <>
+        )}
+        {game.marketState && (quote.mortgage > 0 || loan > 0) && (
+          <p
+            className={`small ${!lending.allowed ? "negative" : "muted"}`}
+            role="status"
+          >
+            Projected debt-to-income:{" "}
+            {Number.isFinite(lending.ratio)
+              ? `${(lending.ratio * 100).toFixed(2)}%`
+              : "no qualifying income"}{" "}
+            / 55% limit.
+            {!lending.allowed &&
+              " Loan/mortgage declined. Reduce borrowing or buy outright."}
+          </p>
+        )}
+        <details className="transaction-calculations">
+          <summary>
+            <span>Purchase calculation</span>
+            <strong>{preciseMoney(cost)} cash</strong>
+          </summary>
+          <dl className="deal-details">
+            <div>
+              <dt>
+                {card.category === "stock" ? "Share purchase" : "Down payment"}
+              </dt>
+              <dd>{preciseMoney(quote.down)}</dd>
+            </div>
+            {card.mortgage > 0 && (
+              <>
+                <div>
+                  <dt>Purchase price</dt>
+                  <dd>{money(card.cost)}</dd>
+                </div>
+                <div>
+                  <dt>Included financing</dt>
+                  <dd>{money(quote.mortgage)}</dd>
+                </div>
+              </>
+            )}
+            {game.marketState && card.category !== "stock" && (
+              <>
+                <div>
+                  <dt>Acquisition fee · 5% of full price</dt>
+                  <dd>{preciseMoney(quote.fee)}</dd>
+                </div>
+                <div>
+                  <dt>Total cash required</dt>
+                  <dd>{preciseMoney(quote.cash)}</dd>
+                </div>
+              </>
+            )}
+            <div>
+              <dt>Cash after purchase</dt>
+              <dd className={lending.cashAfter < 0 ? "negative" : ""}>
+                {preciseMoney(lending.cashAfter)}
+              </dd>
+            </div>
+          </dl>
+          <AssetCashFlow game={game} asset={previewAsset} />
+          {game.marketState && (
+            <dl className="trade-breakdown lending-breakdown">
               <div>
-                <dt>Purchase price</dt>
-                <dd>{money(card.cost)}</dd>
+                <dt>New purchase-loan interest</dt>
+                <dd>{preciseMoney(lending.interest)}/mo</dd>
               </div>
               <div>
-                <dt>Included financing</dt>
-                <dd>{money(card.mortgage)}</dd>
+                <dt>Deal income after all new financing</dt>
+                <dd>{preciseMoney(lending.netAfterLoan)}/mo</dd>
               </div>
-            </>
+              <div>
+                <dt>Household cash flow after purchase</dt>
+                <dd>{preciseMoney(f.flow + lending.netAfterLoan)}/mo</dd>
+              </div>
+              <div>
+                <dt>Counted mortgage &amp; loan payments</dt>
+                <dd>{preciseMoney(lending.service)}/mo</dd>
+              </div>
+              <div>
+                <dt>
+                  Qualifying income after operating costs &amp; mortgage
+                  financing
+                </dt>
+                <dd>{preciseMoney(lending.income)}/mo</dd>
+              </div>
+            </dl>
           )}
-          <div>
-            <dt>Cash after purchase</dt>
-            <dd className={p.cash < cost ? "negative" : ""}>
-              {money(p.cash - cost)}
-            </dd>
-          </div>
-        </dl>
-        <AssetCashFlow game={game} asset={previewAsset} />
+          {game.marketState && (
+            <p className="small muted">
+              DTI = investment mortgage payments + interest on bank and purchase
+              loans, divided by salary + net passive income. Starting role debt
+              is excluded from DTI, but still affects cash flow and reserves.
+              Purchase-loan interest is a household expense, deducted once.
+            </p>
+          )}
+        </details>
+        {game.config.accounting === "auto" &&
+          game.config.liquidityRisk &&
+          lending.cashAfter < lending.reserve && (
+            <p className="small negative">
+              Cash after purchase is below the {preciseMoney(lending.reserve)}{" "}
+              debt reserve. Keep an additional buffer for unexpected costs.
+            </p>
+          )}
         <button
           className="button primary full"
-          disabled={p.cash < cost || !Number.isInteger(count) || count < 1}
-          onClick={() => dispatch({ type: "BUY", shares: count })}
+          disabled={
+            lending.cashAfter < 0 ||
+            !validLoan ||
+            (game.marketState && !lending.allowed) ||
+            (!!loan && p.bankrupt) ||
+            !Number.isInteger(count) ||
+            count < 1 ||
+            count > 100000
+          }
+          onClick={() =>
+            dispatch(
+              d.kind === "discount"
+                ? {
+                    type: "BARGAIN_BUY",
+                    card: d.card,
+                    shares: count,
+                    outright,
+                    loan,
+                  }
+                : { type: "BUY", shares: count, outright, loan },
+            )
+          }
         >
-          Make the investment <ArrowUpRight size={17} />
+          {d.kind === "discount"
+            ? "Buy discounted asset"
+            : "Make the investment"}{" "}
+          <ArrowUpRight size={17} />
         </button>
-        {short > 0 && (
-          <button
-            className="button secondary full"
-            onClick={() =>
-              dispatch({
-                type: "BORROW",
-                amount: Math.ceil(short / 100000) * 100000,
-              })
-            }
-          >
-            Borrow {money(Math.ceil(short / 100000) * 100000)} to cover it
-          </button>
-        )}
+        {!canPurchaseLoan &&
+          short > 0 &&
+          p.id === game.players[game.current].id &&
+          !p.bankrupt && (
+            <button
+              className="button secondary full"
+              disabled={!!game.marketState && !normalCapacity.allowed}
+              onClick={() =>
+                dispatch({
+                  type: "BORROW",
+                  amount: normalLoan,
+                })
+              }
+            >
+              {game.marketState && !normalCapacity.allowed
+                ? "Bank loan exceeds 55% DTI"
+                : `Borrow ${money(normalLoan)} to cover it`}
+            </button>
+          )}
         <button
           className="text-button skip-button"
           onClick={() => dispatch({ type: "PASS" })}
         >
           Keep my cash · pass
         </button>
-        {card.transferable && !d.transferred && (
+        {d.kind === "opportunity" && card.transferable && !d.transferred && (
           <>
             <button
               className="text-button"
@@ -537,7 +752,7 @@ export default function DecisionPanel({
     );
   }
   if (d?.kind === "market") {
-    const card = markets.find((c) => c.id === d.card)!,
+    const card = marketById(d.card)!,
       assets = eligibleAssets(game, p, d.card);
     return (
       <div className="decision-content">
@@ -551,11 +766,21 @@ export default function DecisionPanel({
         {card.effect === "offer" && (
           <>
             <div className="callout">
-              Buyer’s offer:{" "}
-              {card.sharePrice !== undefined
-                ? `${preciseMoney(Math.round(card.sharePrice * factor(game, "values", "stock")))} per share`
-                : `${Math.round(card.multiplier * 100)}% of current game value`}
-              .<small>Mortgages are settled from the proceeds.</small>
+              {game.marketState ? (
+                `Persistent market price: ${(marketIndex(game, card.category) * 100).toFixed(2)}% of opening value`
+              ) : (
+                <>
+                  Buyer’s offer:{" "}
+                  {card.sharePrice !== undefined
+                    ? `${preciseMoney(Math.round(card.sharePrice * factor(game, "values", "stock")))} per share`
+                    : `${Math.round(card.multiplier * 100)}% of current game value`}
+                </>
+              )}
+              .
+              <small>
+                Every eligible owner may sell or hold. Mortgages are settled
+                from proceeds.
+              </small>
             </div>
             {assets.map((a) => (
               <div className="market-asset" key={a.id}>
@@ -565,6 +790,37 @@ export default function DecisionPanel({
                     {preciseMoney(marketSalePrice(a, card, game))} net proceeds
                     · −{preciseMoney(assetIncome(game, a))}/mo
                   </small>
+                  {game.marketState && (
+                    <details className="transaction-calculations sale-calculations">
+                      <summary>Sale calculation · fees &amp; tax</summary>
+                      <dl className="trade-breakdown">
+                        {(() => {
+                          const q = marketSaleQuote(game, a);
+                          return [
+                            ["Gross sale price", q.gross],
+                            ["Bank sale fee · 10% (stocks exempt)", q.fee],
+                            ["Early mortgage payoff · 2 payments", q.penalty],
+                            ["Taxable profit", q.taxableProfit],
+                            ["Capital gains tax · 20%", q.tax],
+                            ["Remaining mortgage", q.mortgage],
+                            ["Net cash received", q.net],
+                          ].map(([label, value]) => (
+                            <div
+                              key={label}
+                              className={
+                                label === "Net cash received"
+                                  ? "trade-total"
+                                  : ""
+                              }
+                            >
+                              <dt>{label}</dt>
+                              <dd>{preciseMoney(Number(value))}</dd>
+                            </div>
+                          ));
+                        })()}
+                      </dl>
+                    </details>
+                  )}
                 </div>
                 <button
                   className="button small-button secondary"
@@ -576,6 +832,12 @@ export default function DecisionPanel({
               </div>
             ))}
           </>
+        )}
+        {game.marketState && game.marketState.indices[card.category] < 5000 && (
+          <p className="callout">
+            A random discounted asset will be offered to everyone after all
+            players finish their market responses.
+          </p>
         )}
         <button
           className="button primary full"
@@ -708,7 +970,9 @@ export default function DecisionPanel({
       </div>
     );
   if (d?.kind === "insolvency") {
-    const short = Math.max(0, d.amount - p.cash);
+    const short = Math.max(0, d.amount - p.cash),
+      amount = Math.ceil(short / 100000) * 100000,
+      capacity = borrowingQuote(game, p, amount);
     return (
       <div className="decision-content">
         <div className="decision-illustration coral">
@@ -723,15 +987,18 @@ export default function DecisionPanel({
         {short > 0 ? (
           <button
             className="button primary full"
+            disabled={p.bankrupt || (!!game.marketState && !capacity.allowed)}
             onClick={() =>
               dispatch({
                 type: "BORROW",
-                amount: Math.ceil(short / 100000) * 100000,
+                amount,
               })
             }
           >
             <Landmark size={17} /> Borrow{" "}
-            {money(Math.ceil(short / 100000) * 100000)}
+            {game.marketState && !capacity.allowed
+              ? "Loan exceeds 55% DTI"
+              : money(amount)}
           </button>
         ) : (
           <button
@@ -742,8 +1009,10 @@ export default function DecisionPanel({
           </button>
         )}
         <p className="small muted">
-          Loans cost {game.config.annualRate}% per year, paid monthly. Check
-          that you can afford the extra expense.
+          {game.marketState
+            ? "New bank loans cost 2% monthly and require debt service within 55% of qualifying income."
+            : `Loans cost ${game.config.annualRate}% per year, paid monthly.`}{" "}
+          Check that you can afford the extra expense.
         </p>
         {p.assets.map((a) => (
           <div className="market-asset" key={a.id}>

@@ -356,6 +356,177 @@ a {
   position: relative;
   box-shadow: 0 5px 16px #26483209;
 }
+.player-card {
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.player-card:hover {
+  box-shadow: 0 3px 14px #2648321c;
+  border-color: #7e9e88;
+}
+.finance-view-note {
+  border-left: 3px solid #7b9d88;
+  background: #edf2e9;
+  color: #48624e;
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.ledger-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #526448;
+  font-size: 12px;
+  margin-top: 18px;
+}
+.ledger-toolbar p {
+  margin: 0;
+}
+.ledger-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ledger-toolbar select {
+  border: 1px solid #c8d4bd;
+  border-radius: 6px;
+  background: #fbfcf5;
+  padding: 8px;
+  color: #3f5635;
+  font: inherit;
+}
+.ledger-round {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+.ledger-totals {
+  margin: 12px 0 0;
+  color: #526448;
+  font-size: 11px;
+}
+.ledger-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  flex-wrap: wrap;
+}
+.ledger-totals dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.ledger-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin: 20px 0 8px;
+}
+.ledger-pagination .button {
+  min-width: 30px;
+  min-height: 34px;
+  padding: 7px 9px;
+}
+.ledger-page-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ledger-page-count {
+  flex: 0 0 100%;
+  text-align: center;
+  color: #526448;
+  font-size: 11px;
+  margin-top: 8px;
+}
+.ledger-calculations > summary > .positive {
+  color: #3f7048 !important;
+}
+.portfolio-item .asset-sale {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+.portfolio-item:has(.asset-sale) {
+  flex-wrap: wrap;
+}
+.asset-sale {
+  color: #526544;
+  font-size: 11px;
+}
+.asset-sale-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: #f3ecd9;
+  border-radius: 7px;
+}
+.asset-sale-status strong,
+.asset-sale-status small {
+  display: block;
+}
+.portfolio-item .asset-sale-status small {
+  margin-top: 5px;
+  line-height: 1.6;
+  color: #48543e;
+  font-size: 11px;
+}
+.asset-sale-quote {
+  border: 1px solid #dce5d7;
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+.asset-sale-quote summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+.asset-sale-quote summary::after {
+  content: "+";
+  margin-left: 4px;
+  font-size: 15px;
+}
+.asset-sale-quote[open] summary::after {
+  content: "−";
+}
+.asset-sale-quote summary strong {
+  margin-left: auto;
+  font-size: 11px;
+}
+.asset-sale-quote p,
+.asset-sale-quote > small {
+  display: block;
+  margin: 12px 0;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.asset-sale-quote dl {
+  margin: 12px 0;
+}
+.asset-sale-quote dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+}
+.asset-sale-quote dd {
+  margin: 0;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.asset-sale > .text-button {
+  margin-top: 7px;
+}
 .finance-stat {
   flex: 1;
   min-width: 0;
@@ -1066,6 +1237,192 @@ a {
   backdrop-filter: blur(5px);
   animation: fade-in 0.15s;
 }
+.tutorial-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: #173c2ab8;
+  backdrop-filter: blur(6px);
+  outline: none;
+}
+.tutorial-backdrop.has-spotlight {
+  background: transparent;
+  backdrop-filter: none;
+}
+.tutorial-spotlight {
+  position: fixed;
+  z-index: 0;
+  border: 2px solid #f3d58a;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 9999px #173c2ab8,
+    0 0 0 5px #f3d58a55;
+  pointer-events: none;
+}
+.tutorial-card {
+  position: relative;
+  z-index: 3;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: min(620px, 100%);
+  padding: 28px 30px 20px;
+  max-height: calc(100dvh - 44px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #fbfcf5;
+  border: 1px solid #e2e8d8;
+  border-radius: 18px;
+  box-shadow: 0 28px 90px #122f224d;
+}
+.tutorial-card.tutorial-anchored {
+  position: fixed;
+  width: min(356px, calc(100% - 36px));
+  padding: 22px;
+}
+.tutorial-heading {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 10px;
+}
+.tutorial-heading > div:last-child {
+  min-width: 0;
+}
+.tutorial-anchored .tutorial-heading {
+  gap: 12px;
+}
+.tutorial-heading h2 {
+  margin: 8px 0 0;
+  color: #335540;
+  font-size: clamp(22px, 3.2vw, 29px);
+  line-height: 1.2;
+  letter-spacing: -0.9px;
+}
+.tutorial-anchored h2 {
+  font-size: 21px;
+  letter-spacing: -0.5px;
+}
+.tutorial-anchored .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.tutorial-avatar {
+  display: grid;
+  place-items: center;
+  align-self: start;
+  flex-shrink: 0;
+  width: 112px;
+  height: 112px;
+  border-radius: 28px;
+  background: #eef1e5;
+}
+.tutorial-anchored .tutorial-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+}
+.tutorial-avatar canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: 1;
+}
+.tutorial-teal .tutorial-avatar {
+  background: #e1eee8;
+}
+.tutorial-gold .tutorial-avatar {
+  background: #f4ecd6;
+}
+.tutorial-coral .tutorial-avatar {
+  background: #f4e2da;
+}
+.tutorial-purple .tutorial-avatar {
+  background: #e9e1f0;
+}
+.tutorial-body {
+  margin: 18px 0 0;
+  color: #65745b;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.tutorial-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px !important;
+  margin-bottom: 0;
+  color: #796338 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.02em;
+}
+.tutorial-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e6eadf;
+  color: #65745b;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tutorial-footer .button {
+  min-height: 36px;
+  padding: 8px 13px;
+}
+.tutorial-credit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  color: #65745b;
+  font-size: 9px;
+}
+.tutorial-close {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  color: #75826d;
+  background: transparent;
+  cursor: pointer;
+}
+.tutorial-close:hover {
+  background: #edf0e6;
+  color: #34523a;
+}
+@media (max-width: 560px) {
+  .tutorial-card,
+  .tutorial-card.tutorial-anchored {
+    padding: 20px;
+  }
+  .tutorial-heading {
+    gap: 12px;
+  }
+  .tutorial-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+  .tutorial-heading h2 {
+    font-size: 21px;
+  }
+  .tutorial-body {
+    font-size: 12px;
+  }
+}
 .modal {
   width: 580px;
   max-width: 100%;
@@ -1699,6 +2056,9 @@ a {
 .portfolio-item > div:nth-child(2) {
   flex: 1;
 }
+.portfolio-item > div:nth-child(2) > small {
+  display: block;
+}
 .portfolio-item h4,
 .debt-item h4,
 .ledger-item h4 {
@@ -1722,7 +2082,7 @@ a {
 .portfolio-item > strong {
   font-size: 16px;
   font-weight: 550;
-  color: #6c8c4e;
+  color: #4e6a34;
   text-align: right;
 }
 .portfolio-item > strong small {
@@ -2533,7 +2893,7 @@ html[data-motion="reduced"] *:after {
     display: block;
     margin-top: 23px;
   }
-  .play-layout:not(.mobile-board) > .board-panel {
+  .play-layout:not(.mobile-board) .board-panel {
     display: none;
   }
   .play-layout:not(.mobile-decision) > .decision-column {

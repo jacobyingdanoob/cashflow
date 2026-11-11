@@ -1,3 +1,4 @@
+import { createLegacyGame as baseCreateGame } from "../../tests/legacyGame";
 import { describe, expect, it } from "vitest";
 import {
   deals,
@@ -14,7 +15,6 @@ import {
 import {
   actingPlayer,
   assetFromDeal,
-  createGame as baseCreateGame,
   finances,
   playerFinancials,
   reduceGame as rawReduceGame,
@@ -71,7 +71,7 @@ describe("original content and setup", () => {
       fastDeals.length,
       innerBoard.length,
       outerBoard.length,
-    ]).toEqual([15, 44, 33, 36, 39, 8, 12, 24, 32]);
+    ]).toEqual([15, 44, 33, 36, 39, 9, 12, 24, 32]);
     expect(
       new Set(
         outerBoard.filter((s) => s.kind === "business").map((s) => s.content),
@@ -79,15 +79,16 @@ describe("original content and setup", () => {
     ).toBe(12);
     expect(new Set(deals.map((d) => d.id)).size).toBe(deals.length);
   });
-  it("starts all six participants with unique professions and the same multipliers", () => {
+  it("starts all six participants with identical financial sheets and the same multipliers", () => {
     const s = createGame({
       opponents: 5,
       startingCash: 2,
       livingExpenses: 1.25,
     });
-    expect(new Set(s.players.map((p) => p.profession)).size).toBe(6);
+    expect(new Set(s.players.map((p) => p.profession)).size).toBe(1);
     for (const p of s.players) {
       const pr = professions.find((v) => v.id === p.profession)!;
+      expect(playerFinancials(s, p)).toEqual(playerFinancials(s, s.players[0]));
       expect(p.living).toBe(Math.round(pr.living * 1.25));
       expect(p.cash).toBe((pr.savings + playerFinancials(s, p).flow) * 2);
       expect(p.assets).toHaveLength(0);

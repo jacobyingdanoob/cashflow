@@ -1,6 +1,7 @@
 import { assetIncomeBreakdown, economicEvents } from "../game/economy";
 import { preciseMoney } from "../game/engine";
 import type { Asset, GameState } from "../game/types";
+import { marketIndex } from "../game/market";
 
 export default function AssetCashFlow({
   game,
@@ -30,7 +31,7 @@ export default function AssetCashFlow({
         ? [{ ...active, name: event.name, changes: changes.join(", ") }]
         : [];
     });
-  if (!asset.financing && !effects.length) return null;
+  if (!asset.financing && !effects.length && !game.marketState) return null;
   const content = (
     <div className="asset-cash-flow">
       <dl>
@@ -55,6 +56,15 @@ export default function AssetCashFlow({
       ))}
       {effects.length > 0 && (
         <p>Without temporary events: {preciseMoney(asset.income)}/mo, net.</p>
+      )}
+      {game.marketState && (
+        <p>
+          Current market index:{" "}
+          {(marketIndex(game, asset.category) * 100).toFixed(2)}%.{" "}
+          {asset.category === "property"
+            ? "Repricing changes property value, not operating rent."
+            : "Operating income follows one quarter of the index movement from 100%."}
+        </p>
       )}
       {net < 0 && (
         <p className="negative">

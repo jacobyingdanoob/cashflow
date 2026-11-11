@@ -1,7 +1,7 @@
+import { createLegacyGame as baseCreateGame } from "./legacyGame";
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import {
-  createGame as baseCreateGame,
   assetFromDeal,
   playerFinancials,
   reduceGame,
@@ -20,6 +20,7 @@ const createGame = (options: Partial<GameConfig> = {}) => ({
     liquidityRisk: false,
     principalRate: 0,
     economicCycles: false,
+    tutorials: false,
     ...options,
   }),
   roleRevealed: true,
@@ -119,6 +120,7 @@ test("desktop board, setup settings, keyboard dialog, and saved games", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.getByRole("button", { name: "Start my story" }).click();
+  await page.getByRole("button", { name: "Turn off tutorials" }).click();
   await expect(
     page.getByRole("heading", { name: "Small moves. Bigger possibilities." }),
   ).toBeVisible();
@@ -143,6 +145,7 @@ test("desktop board, setup settings, keyboard dialog, and saved games", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Start my story" }).click();
   await expect(page.getByText("Round 1 / 25")).toBeVisible();
+  await page.getByRole("button", { name: "Turn off tutorials" }).click();
   const configured = await readState(page);
   expect(configured.config.principalRate).toBe(0);
   expect(
@@ -150,9 +153,9 @@ test("desktop board, setup settings, keyboard dialog, and saved games", async ({
       .difficulty,
   ).toBe("hard");
   expect(configured.config.adaptedCards).toBe(false);
-  await expect(page.locator(".economy-banner")).toContainText(
-    "first cycle in round 11",
-  );
+  await expect(
+    page.getByRole("button", { name: "Market", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Save & resume" }).click();
   await page.getByLabel("Save name 1").fill("My first city");
   await page.getByRole("button", { name: "Save", exact: true }).first().click();
@@ -283,6 +286,7 @@ test("tablet and phone fit, phone navigation and reduced motion work", async ({
   await page.setViewportSize({ width: 834, height: 1194 });
   await page.goto("/");
   await page.getByRole("button", { name: "Start my story" }).click();
+  await page.getByRole("button", { name: "Turn off tutorials" }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -991,6 +995,12 @@ test("setup previews five roles per tier and enables adapted cards only on reque
   await expect(adapted).not.toBeChecked();
   await adapted.check();
   await page.getByLabel("NPC difficulty").selectOption("easy");
+  await page.getByLabel("NPC opponents").selectOption("5");
+  await page.getByLabel("Starting cash multiplier").selectOption("2");
+  await page.getByLabel("Living expense multiplier").selectOption("1.25");
+  await expect(page.locator(".role-preview")).toContainText(
+    "Every NPC starts with the same role, cash, debt, income and expenses as you.",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   await expectAccessible(page);
   await page.screenshot({
@@ -1015,6 +1025,23 @@ test("setup previews five roles per tier and enables adapted cards only on reque
   expect(
     professions.find((p) => p.id === state.players[0].profession)!.difficulty,
   ).toBe("hard");
+  expect(state.players).toHaveLength(6);
+  for (const npc of state.players.slice(1)) {
+    expect(npc.profession).toBe(state.players[0].profession);
+    expect(npc.debts).toEqual(state.players[0].debts);
+    expect(npc.childCost).toBe(state.players[0].childCost);
+    expect(playerFinancials(state, npc)).toEqual(
+      playerFinancials(state, state.players[0]),
+    );
+  }
+  await expect(
+    page.getByRole("dialog", { name: "Meet your new life" }),
+  ).toContainText(
+    "Every player starts with this role and identical cash, debt, income and expenses.",
+  );
+  await page.getByRole("button", { name: "Start my story" }).click();
+  await page.reload();
+  expect((await readState(page)).players).toEqual(state.players);
 });
 
 test("dreams have individual icons, labels and a persistent chosen marker", async ({
@@ -1090,7 +1117,31 @@ test("notification filtering persists and clear all removes visible and hidden u
     };
   game.notices = [own, shared, unrelated];
   await seed(page, game);
-  await page.getByRole("checkbox", { name: "Only involving me" }).check();
+  const clear = page.getByRole("button", {
+    name: "Clear all notifications",
+    exact: true,
+  });
+  const expand = page.locator(".older-notifications summary > span");
+  const clearBox = (await clear.boundingBox())!,
+    expandBox = (await expand.boundingBox())!;
+  expect(
+    Math.abs(
+      clearBox.y + clearBox.height / 2 - expandBox.y - expandBox.height / 2,
+    ),
+  ).toBeLessThan(8);
+  expect(clearBox.x).toBeGreaterThan(expandBox.x + expandBox.width);
+  await expect(
+    page.getByRole("checkbox", { name: "Only involving me" }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: "test-results/notification-controls-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Game settings" }).click();
+  await page
+    .getByRole("switch", { name: /Only notifications involving you/ })
+    .check();
+  await page.getByRole("button", { name: "Close dialog" }).click();
   await expect(
     page.getByRole("button", {
       name: "View details: Maya unrelated turn",
@@ -1109,11 +1160,24 @@ test("notification filtering persists and clear all removes visible and hidden u
   expect((await readState(page)).notices).toHaveLength(3);
   await expectAccessible(page);
   await page.reload();
+  await page.getByRole("button", { name: "Game settings" }).click();
   await expect(
-    page.getByRole("checkbox", { name: "Only involving me" }),
+    page.getByRole("switch", { name: /Only notifications involving you/ }),
   ).toBeChecked();
+  await page.getByRole("button", { name: "Close dialog" }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".game-notification")).toHaveCount(1);
+  const phoneClear = (await clear.boundingBox())!,
+    phoneExpand = (await expand.boundingBox())!;
+  expect(
+    Math.abs(
+      phoneClear.y +
+        phoneClear.height / 2 -
+        phoneExpand.y -
+        phoneExpand.height / 2,
+    ),
+  ).toBeLessThan(8);
+  expect(phoneClear.x).toBeGreaterThan(phoneExpand.x + phoneExpand.width);
   await page.screenshot({
     path: "test-results/notification-controls-phone.png",
     fullPage: true,
@@ -1134,6 +1198,63 @@ test("notification filtering persists and clear all removes visible and hidden u
   await expect(
     page.getByRole("switch", { name: /Only notifications involving you/ }),
   ).toBeChecked();
+});
+
+test("coach distinguishes a large cash balance from a thin debt-linked shock buffer", async ({
+  page,
+}) => {
+  const game = completedMatch(),
+    p = game.players[0];
+  game.config.liquidityRisk = true;
+  p.cash = 5000000;
+  p.debts = [
+    {
+      id: "home",
+      name: "Home mortgage",
+      kind: "home",
+      principal: 49050000,
+      payment: 20000,
+    },
+  ];
+  p.assets = [];
+  await seed(page, game);
+  const coach = page.locator(".game-coach"),
+    stats = coach.locator(".coach-player-stats");
+  await coach.scrollIntoViewIfNeeded();
+  await expect(stats).toContainText("Cash on hand $50,000.00");
+  await expect(stats).toContainText("Total debt $490,500.00");
+  await expect(stats).toContainText("Required reserve$49,050.00");
+  await expect(stats).toContainText("Cash above required reserve$950.00");
+  await expect(coach.locator(".coach-tip").first()).toContainText(
+    "Protect the cash above your debt reserve",
+  );
+  await expect(coach.locator(".coach-tip").first()).toContainText(
+    "$50.00 below the reserve",
+  );
+  await expect(coach).not.toContainText(
+    "Consider only cash beyond your safety buffer",
+  );
+  await expectAccessible(page);
+  await page.screenshot({
+    path: "test-results/risk-coach-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stats.scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(await stats.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  await expect(stats.locator(".coach-risk")).toContainText("$950.00");
+  await expectAccessible(page);
+  await page.screenshot({
+    path: "test-results/risk-coach-phone.png",
+    fullPage: true,
+  });
 });
 
 test("elimination opens a personal review, NPCs keep playing, and their finish opens the final report", async ({
@@ -1183,9 +1304,12 @@ test("elimination opens a personal review, NPCs keep playing, and their finish o
   await expect(personal).toHaveCount(0);
   await page.getByRole("button", { name: "Open financial statement" }).click();
   await expect(page.getByRole("dialog")).toContainText(
-    "Your game ended in round 25.",
+    "Eliminated in round 25.",
   );
-  await expect(page.getByRole("tab", { name: "Loans & debt" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Loans & debt", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Borrow", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page
     .locator(".spectator-banner")
@@ -1261,11 +1385,17 @@ test("wiki sits beside How to play and searches roles without changing the match
   const links = page
     .getByRole("navigation", { name: "Main navigation" })
     .getByRole("button");
-  await expect(links).toHaveText(["The game", "How to play", "Wiki"]);
+  await expect(links).toHaveText([
+    "The game",
+    "Market",
+    "How to play",
+    "Wiki",
+    "Rulebook",
+  ]);
   await page.getByRole("button", { name: "Wiki", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Game wiki" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("status")).toHaveText("212 entries");
+  await expect(dialog.getByRole("status")).toHaveText("213 entries");
   await expect(
     page.getByRole("button", { name: "Previous", exact: true }),
   ).toBeDisabled();
@@ -1301,7 +1431,7 @@ test("wiki sits beside How to play and searches roles without changing the match
     page.getByRole("heading", { name: "No matching entries" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Clear all filters" }).click();
-  await expect(dialog.getByRole("status")).toHaveText("212 entries");
+  await expect(dialog.getByRole("status")).toHaveText("213 entries");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   expect(await readState(page)).toEqual(game);

@@ -215,7 +215,7 @@
 .notification-stack.has-pile {
   padding-top: 8px;
 }
-.has-pile .older-notifications {
+.has-pile .notification-history {
   position: relative;
   border: 1px solid #d3d9c9;
   box-shadow:

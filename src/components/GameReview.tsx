@@ -8,7 +8,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { money, preciseMoney, playerFinancials } from "../game/engine";
-import { coaching, playerHistory, personalReviewState } from "../game/review";
+import {
+  coaching,
+  coachingRisk,
+  playerHistory,
+  personalReviewState,
+} from "../game/review";
 import type {
   FinancialHistoryPoint,
   Financials,
@@ -298,6 +303,7 @@ function ReviewContent({
   );
   const p = game.players.find((p) => p.id === coachPlayer)!,
     f = playerFinancials(game, p),
+    risk = coachingRisk(game, coachPlayer),
     start = history[0]?.values ?? f;
   const rounds = Math.min(game.round, game.config.roundLimit || game.round);
   const winners = game.players.filter((p) => game.winners.includes(p.id));
@@ -482,8 +488,9 @@ function ReviewContent({
               <GraduationCap size={21} /> A word from your game coach.
             </h3>
             <p>
-              Specific lessons from recorded decisions and financial changes. No
-              hindsight about hidden cards or future rolls.
+              Debt, liquidity and shock resilience, grounded in recorded
+              decisions. Required reserves and emergency cash are counted
+              separately.
             </p>
           </div>
           <label className="form-field">
@@ -501,6 +508,44 @@ function ReviewContent({
           </label>
         </div>
         <div className="coach-player-stats">
+          <span>
+            Cash on hand <strong>{preciseMoney(f.cash)}</strong>
+          </span>
+          <span>
+            Total debt <strong>{preciseMoney(f.debt)}</strong>
+          </span>
+          <span>
+            Required reserve
+            <strong>{preciseMoney(risk.reserve)}</strong>
+            <small>
+              {game.config.liquidityRisk
+                ? "10% of total debt"
+                : "Reserve rule off"}
+            </small>
+          </span>
+          <span
+            className={
+              risk.bufferAfterPrincipal < risk.safetyBuffer
+                ? "coach-risk"
+                : undefined
+            }
+          >
+            {game.config.liquidityRisk
+              ? "Cash above required reserve"
+              : "Cash available for shocks"}
+            <strong>{preciseMoney(risk.buffer)}</strong>
+            <small>
+              {risk.buffer < 0
+                ? game.config.liquidityRisk
+                  ? "Below required reserve"
+                  : "Cash deficit"
+                : risk.buffer < risk.safetyBuffer
+                  ? "Below coaching buffer target"
+                  : risk.bufferAfterPrincipal < risk.safetyBuffer
+                    ? "Thin buffer after opted-in principal"
+                    : "Above coaching buffer target"}
+            </small>
+          </span>
           <span>
             Passive income{" "}
             <strong>

@@ -28,21 +28,82 @@ describe("starting roles", () => {
     expect(Math.min(...debts)).toBeLessThan(1000000);
     expect(Math.max(...debts)).toBeGreaterThan(40000000);
   });
-  it("draws a seeded role in the selected tier with unique NPC roles", () => {
+  it("draws a seeded role in the selected tier and gives every opponent the same start", () => {
     for (const roleDifficulty of tiers) {
       const seen = new Set<string>();
       for (let sample = 1; sample <= 100; sample++) {
         const seed = (sample * 2654435761) >>> 0;
-        const options = { roleDifficulty, seed, opponents: 5 };
+        const options = { roleDifficulty, seed, opponents: (sample % 5) + 1 };
         const s = createGame(options);
         expect(s).toEqual(createGame(options));
         const role = professions.find((p) => p.id === s.players[0].profession)!;
         expect(role.difficulty).toBe(roleDifficulty);
-        expect(new Set(s.players.map((p) => p.profession)).size).toBe(6);
+        expect(s.players).toHaveLength(options.opponents + 1);
+        expect(new Set(s.players.map((p) => p.profession)).size).toBe(1);
+        const initial = playerFinancials(s, s.players[0]);
+        for (const player of s.players) {
+          expect(playerFinancials(s, player)).toEqual(initial);
+          expect(s.history.find((h) => h.player === player.id)?.values).toEqual(
+            initial,
+          );
+        }
         seen.add(role.id);
       }
       expect(seen.size).toBe(5);
     }
+  });
+  it.each([false, true])(
+    "keeps explicit roles and sandbox finances equal with liquidity risk %s",
+    (liquidityRisk) => {
+      const settings = [
+        { startingCash: 0.5, livingExpenses: 1.25, annualRate: 24 },
+        { startingCash: 1, livingExpenses: 1, annualRate: 12 },
+        { startingCash: 2, livingExpenses: 0.75, annualRate: 6 },
+        { startingCash: 5, livingExpenses: 1.25, annualRate: 18 },
+      ];
+      for (const role of professions)
+        for (const [index, economy] of settings.entries()) {
+          const s = createGame({
+              profession: role.id,
+              opponents: 5,
+              liquidityRisk,
+              difficulty: tiers[index % 3],
+              ...economy,
+            }),
+            human = s.players[0],
+            initial = playerFinancials(s, human);
+          expect(new Set(s.players.map((p) => p.profile)).size).toBe(4);
+          for (const npc of s.players.slice(1)) {
+            expect(npc.profession).toBe(role.id);
+            expect(playerFinancials(s, npc)).toEqual(initial);
+            expect(npc.debts).toEqual(human.debts);
+            expect(npc.childCost).toBe(human.childCost);
+            expect(npc.debts).not.toBe(human.debts);
+            expect(npc.debts[0]).not.toBe(human.debts[0]);
+          }
+          const roundTrip = validateSave(JSON.parse(JSON.stringify(s)));
+          expect(roundTrip.players).toEqual(s.players);
+          expect(reduceGame(roundTrip, { type: "ROLL" })).toEqual(
+            reduceGame(s, { type: "ROLL" }),
+          );
+        }
+    },
+  );
+  it("keeps each player's loans separate after starting from the same financial sheet", () => {
+    const s = createGame({ profession: "lawyer", opponents: 5 }),
+      debt = s.players[0].debts[0],
+      original = debt.principal;
+    const repaid = reduceGame(s, {
+      type: "REPAY",
+      debtId: debt.id,
+      amount: 100000,
+    });
+    expect(repaid.players[0].debts[0].principal).toBe(original - 100000);
+    for (const npc of repaid.players.slice(1))
+      expect(npc.debts[0].principal).toBe(original);
+    expect(professions.find((p) => p.id === "lawyer")!.debts[0].principal).toBe(
+      original,
+    );
   });
   it("persists the role reveal without changing balances or future randomness", () => {
     const s = createGame({ roleDifficulty: "hard", seed: 47 });
@@ -89,10 +150,10 @@ describe("optional adapted cards and saved games", () => {
     const adapted = createGame({ adaptedCards: true });
     expect(original.config.adaptedCards).toBe(false);
     expect(Object.values(original.decks).map((d) => d.length)).toEqual([
-      56, 18, 24, 24,
+      56, 18, 132, 24,
     ]);
     expect(Object.values(adapted.decks).map((d) => d.length)).toEqual([
-      104, 33, 36, 39,
+      104, 33, 132, 39,
     ]);
     expect(
       Object.values(original.decks)
@@ -120,7 +181,7 @@ describe("optional adapted cards and saved games", () => {
         }
         expect(s.decks[kind].length).toBeGreaterThan(0);
         expect(s.decks[kind].some((id) => id.startsWith("enc-"))).toBe(
-          adaptedCards,
+          adaptedCards && kind !== "market",
         );
       }
     });

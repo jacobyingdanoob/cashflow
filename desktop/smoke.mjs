@@ -11,6 +11,7 @@ const version = JSON.parse(
 const executable = path.resolve(
   process.argv[2] || `release/Cashflow-${version}-windows-x86.exe`,
 );
+const previousExecutable = process.env.CASHFLOW_UPGRADE_FROM;
 const profile = await fs.mkdtemp(
   path.join(os.tmpdir(), "cashflow-desktop-test-"),
 );
@@ -29,13 +30,13 @@ async function assertX86(file) {
   );
 }
 
-async function launch() {
+async function launch(binary = executable) {
   const activePort = path.join(profile, "DevToolsActivePort");
   await fs.rm(activePort, { force: true });
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(
-    executable,
+    binary,
     ["--remote-debugging-port=0", `--user-data-dir=${profile}`],
     { env, stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -102,13 +103,19 @@ const errors = [];
 try {
   await assertX86(executable);
   await assertX86(path.resolve("release/win-ia32-unpacked/Cashflow.exe"));
-  run = await launch();
+  run = await launch(previousExecutable || executable);
   const { page } = run;
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(
     page.getByRole("button", { name: "Start my story" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start my story" }).click();
+  if (!previousExecutable) {
+    await expect(
+      page.getByRole("dialog", { name: "Cashflow tutorial" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Turn off tutorials" }).click();
+  }
   await expect(page.getByRole("group", { name: /Game board/ })).toBeVisible();
   assert.equal(
     await page.evaluate(() => typeof window.require),
@@ -138,15 +145,38 @@ try {
   assert.equal(restored.state.config.seed, saved.state.config.seed);
   assert.equal(restored.state.rng, saved.state.rng);
   assert.equal(restored.state.roleRevealed, true);
-  assert.deepEqual(restored.state.players[0], saved.state.players[0]);
+  // Upgrades may add metadata; every field present in the original player must survive.
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.keys(saved.state.players[0]).map((key) => [
+        key,
+        restored.state.players[0][key],
+      ]),
+    ),
+    saved.state.players[0],
+  );
+  assert.equal(Boolean(restored.state.marketState), !previousExecutable);
   await expect(
     run.page.getByRole("button", { name: "Start my story" }),
   ).toHaveCount(0);
+  for (const [button, title] of [
+    ["Market", "The city markets"],
+    ["Wiki", "Game wiki"],
+    ["Rulebook", "Rulebook"],
+  ]) {
+    await run.page.getByRole("button", { name: button, exact: true }).click();
+    await expect(
+      run.page.getByRole("dialog", { name: title, exact: true }),
+    ).toBeVisible();
+    await run.page
+      .getByRole("button", { name: "Close dialog", exact: true })
+      .click();
+  }
   await close(run);
   run = undefined;
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: portable EXE and runtime are x86; offline launch, game board, dice roll, renderer isolation, clean shutdown, and saved-game restore.",
+    `PASS: portable EXE and runtime are x86; offline launch, game board, dice roll, renderer isolation, reference pages, clean shutdown, and ${previousExecutable ? "v1.0.0 save upgrade" : "saved-game restore"}.`,
   );
 } finally {
   if (run) await close(run).catch(() => run.child.kill());

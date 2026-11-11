@@ -1,5 +1,7 @@
 import { ArrowRight, ReceiptText, Dice5 } from "lucide-react";
 import { economicEvents } from "../game/economy";
+import { marketTrends } from "../game/trends";
+import { TrendDetails } from "./MarketTrend";
 import { markets, expenses } from "../game/content";
 import CardSource from "./CardSource";
 import Modal from "./Modal";
@@ -24,6 +26,7 @@ export default function ActivityDialog({
 }) {
   const player = game.players.find((p) => p.id === notice.player)!;
   const card = economicEvents.find((c) => c.id === notice.eventId);
+  const trend = marketTrends.find((c) => c.id === notice.eventId);
   const changes = notice.changes.filter((c) =>
     metrics.some(([key]) => c.before[key] !== c.after[key]),
   );
@@ -56,6 +59,12 @@ export default function ActivityDialog({
           <span className="event-paused">Activity details</span>
         </div>
         <p className="event-description">{notice.description}</p>
+        {trend && (
+          <div className="cycle-reference">
+            <strong>{trend.name} · 3 rounds</strong>
+            <TrendDetails card={trend} />
+          </div>
+        )}
         <CardSource
           source={
             expenses.find((c) => c.name === notice.title)?.source ??

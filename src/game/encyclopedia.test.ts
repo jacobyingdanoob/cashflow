@@ -1,3 +1,4 @@
+import { createLegacyGame as createGame } from "../../tests/legacyGame";
 import { describe, expect, it } from "vitest";
 import { professions } from "./content";
 import {
@@ -8,7 +9,6 @@ import {
 } from "./encyclopedia";
 import {
   assetFromDeal,
-  createGame,
   marketSalePrice,
   playerFinancials,
   reduceGame,

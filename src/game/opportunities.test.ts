@@ -1,6 +1,7 @@
+import { createLegacyGame as createGame } from "../../tests/legacyGame";
 import { describe, it, expect } from "vitest";
 import { smallDeals, smallDealCopies } from "./content";
-import { createGame, reduceGame } from "./engine";
+import { reduceGame } from "./engine";
 import { validateSave } from "./storage";
 import type { GameState } from "./types";
 

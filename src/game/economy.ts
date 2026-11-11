@@ -1,4 +1,5 @@
 import type { Asset, Deal, EconomicEvent, GameState, Player } from "./types";
+import { marketFactor } from "./market";
 export const FIRST_ECONOMIC_ROUND = 11;
 export const ECONOMIC_INTERVAL = 3;
 export const isEconomicRound = (round: number) =>
@@ -267,6 +268,7 @@ export function factor(
   key: "values" | "income" | "loanPayments",
   category?: Asset["category"],
 ) {
+  if (s?.marketState) return marketFactor(s, key, category);
   return (
     s?.economy?.active.reduce((value, a) => {
       const event = economicEvents.find((c) => c.id === a.card)!;
@@ -294,11 +296,19 @@ export function assetIncomeBreakdown(s: GameState | undefined, a: Asset) {
 export function assetIncome(s: GameState | undefined, a: Asset) {
   return assetIncomeBreakdown(s, a).net;
 }
+export function baseDebtPayment(
+  d: Player["debts"][number],
+  annualRate: number,
+) {
+  return d.monthlyRateBps !== undefined
+    ? Math.round((d.principal * d.monthlyRateBps) / 10000)
+    : d.kind === "bank"
+      ? Math.round((d.principal * annualRate) / 1200)
+      : d.payment;
+}
 export function debtPayment(s: GameState, d: Player["debts"][number]) {
   return Math.round(
-    (d.kind === "bank"
-      ? Math.round((d.principal * s.config.annualRate) / 1200)
-      : d.payment) * factor(s, "loanPayments"),
+    baseDebtPayment(d, s.config.annualRate) * factor(s, "loanPayments"),
   );
 }
 export function effectiveDeal(s: GameState, c: Deal): Deal {
@@ -387,8 +397,9 @@ export function totalDebt(p: Player) {
     p.assets.reduce((v, a) => v + a.mortgage, 0)
   );
 }
+export const reserveForDebt = (debt: number) => Math.ceil(debt / 10);
 export function requiredReserve(p: Player) {
-  return Math.ceil(totalDebt(p) / 10);
+  return reserveForDebt(totalDebt(p));
 }
 export function distressValue(s: GameState, a: Asset) {
   return Math.max(0, Math.floor((assetValue(s, a) - a.mortgage) / 2));

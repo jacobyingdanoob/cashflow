@@ -9,7 +9,6 @@ export default function Notifications({
   onClear,
   onlyMine,
   playerId,
-  onOnlyMineChange,
 }: {
   notices: ActivityNotice[];
   onDismiss: (id: number) => void;
@@ -17,7 +16,6 @@ export default function Notifications({
   onClear: () => void;
   onlyMine: boolean;
   playerId: string;
-  onOnlyMineChange: (value: boolean) => void;
 }) {
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const [visibleCount, setVisibleCount] = useState(() =>
@@ -61,16 +59,36 @@ export default function Notifications({
       <div className="notification-live" aria-live="polite" aria-atomic="true">
         {shown.at(-1)?.title}
       </div>
-      <div className="notification-controls">
-        <label>
-          <input
-            type="checkbox"
-            checked={onlyMine}
-            onChange={(e) => onOnlyMineChange(e.target.checked)}
-          />
-          Only involving me
-        </label>
+      <div className="notification-history">
+        {shown.length > visibleCount ? (
+          <details className="older-notifications">
+            <summary>
+              <Bell size={14} /> {shown.length - visibleCount} earlier updates{" "}
+              <span>Expand stack</span>
+            </summary>
+            <div className="notification-history-list">
+              {shown
+                .slice(0, -visibleCount)
+                .reverse()
+                .map((n) => (
+                  <button
+                    key={n.id}
+                    aria-label={`View details: ${n.title}`}
+                    onClick={() => onExpand(n)}
+                  >
+                    {n.title}
+                  </button>
+                ))}
+            </div>
+          </details>
+        ) : (
+          <div className="notification-stack-label">
+            <Bell size={14} />{" "}
+            {shown.length ? "Notifications" : "No updates involving you"}
+          </div>
+        )}
         <button
+          className="notification-clear"
           aria-label="Clear all notifications"
           title="Clear all notifications, including filtered updates"
           onClick={onClear}
@@ -78,29 +96,6 @@ export default function Notifications({
           Clear all
         </button>
       </div>
-      {!shown.length && (
-        <p className="notification-empty">No updates involving you.</p>
-      )}
-      {shown.length > visibleCount && (
-        <details className="older-notifications">
-          <summary>
-            <Bell size={14} /> {shown.length - visibleCount} earlier updates{" "}
-            <span>Expand stack</span>
-          </summary>
-          {shown
-            .slice(0, -visibleCount)
-            .reverse()
-            .map((n) => (
-              <button
-                key={n.id}
-                aria-label={`View details: ${n.title}`}
-                onClick={() => onExpand(n)}
-              >
-                {n.title}
-              </button>
-            ))}
-        </details>
-      )}
       {shown.slice(-visibleCount).map((n) => (
         <div
           key={n.id}
@@ -126,7 +121,6 @@ export default function Notifications({
                 ? n.events.slice(-1)[0]?.replace(/^.*?: /, "")
                 : n.description}
             </span>
-            <small>View details · dismisses after 30 seconds</small>
           </button>
           <button
             className="notification-dismiss icon-button"

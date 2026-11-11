@@ -90,7 +90,10 @@ export default function Setup({
         {select(
           "opponents",
           "NPC opponents",
-          [1, 2, 3, 4, 5].map((v) => [v, `${v} opponent${v === 1 ? "" : "s"}`]),
+          [1, 2, 3, 4, 5, 6, 7, 8].map((v) => [
+            v,
+            `${v} opponent${v === 1 ? "" : "s"}`,
+          ]),
           true,
         )}
         {select("roleDifficulty", "Your starting difficulty", [
@@ -102,6 +105,21 @@ export default function Setup({
           ["auto", "Automatic · focus on strategy"],
           ["manual", "Guided manual · keep your own books"],
         ])}
+        <label className="toggle-row">
+          <span>
+            <strong>Interactive tutorial</strong>
+            <small>
+              A friendly dollar-bill guide explains the board and each new
+              feature the first time you meet it. You can turn it off later.
+            </small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={c.tutorials}
+            onChange={(e) => change("tutorials", e.target.checked)}
+          />
+        </label>
         {select("victory", "Your finish line", [
           ["full", "Full game · build toward your dream"],
           ["freedom", "Financial freedom · escape the Rat Race"],
@@ -110,8 +128,9 @@ export default function Setup({
       <div className="role-preview" aria-live="polite">
         <strong>One of these five lives will be yours.</strong>
         <p className="small muted">
-          Your role is drawn randomly from this tier. Opponents draw from all 15
-          roles; their decision skill is set separately in the sandbox.
+          Your role is drawn randomly from this tier. Every NPC starts with the
+          same role, cash, debt, income and expenses as you. Their decision
+          skill is set separately in the sandbox.
         </p>
         <div className="role-preview-grid">
           {professions
@@ -193,12 +212,15 @@ export default function Setup({
             [0.75, 1, 1.25].map((n) => [n, `${n}× household costs`]),
             true,
           )}
-          {select(
-            "annualRate",
-            "Personal bank-loan annual rate",
-            [6, 12, 18, 24].map((n) => [n, `${n}% annual simple interest`]),
-            true,
-          )}
+          <div className="callout small">
+            <b>Lending rules</b>
+            <p>
+              Bank loans: 2% monthly. Type 1 purchase loans: 1% monthly. New
+              debt must fit the 55% debt-to-income limit; starting role debt is
+              excluded. Financed Type 1 down payments rise from 10% to 35%
+              across purchases.
+            </p>
+          </div>
           {select(
             "incomeGoal",
             "Additional Fast Track income",
@@ -253,8 +275,9 @@ export default function Setup({
               onChange={(e) => change("liquidityRisk", e.target.checked)}
             />
           </label>
+
           <label className="toggle-row">
-            <span>Economic cycles · round 11, then every 3 rounds</span>
+            <span>Economic market trends · every 5 rounds</span>
             <input
               type="checkbox"
               role="switch"
@@ -275,10 +298,10 @@ export default function Setup({
           </label>
         </div>
         <p className="small muted">
-          Starting income, debt and expenses depend on the role drawn. Principal
-          repayments are optional unless you opt into autopay above. Matching
-          seeds and settings reproduce the same initial game. A completed round
-          gives every active player a turn.
+          The role drawn sets identical starting finances for everyone.
+          Principal repayments are optional unless you opt into autopay above.
+          Matching seeds and settings reproduce the same initial game. A
+          completed round gives every active player a turn.
           {c.liquidityRisk &&
             " Starting cash includes an additional reserve equal to 10% of the profession’s debt, so the opening mortgage does not trigger an immediate crisis."}
         </p>

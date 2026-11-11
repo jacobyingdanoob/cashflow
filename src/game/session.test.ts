@@ -1,6 +1,7 @@
+import { createLegacyGame as createGame } from "../../tests/legacyGame";
 import { describe, expect, it } from "vitest";
 import { dreams, fastTrackBoard, outerBoard } from "./content";
-import { createGame, playerFinancials, reduceGame } from "./engine";
+import { playerFinancials, reduceGame } from "./engine";
 import { noticeRelatesToPlayer } from "./activity";
 import { personalReviewState } from "./review";
 import { validateSave } from "./storage";

@@ -15,6 +15,20 @@ export type SpaceKind =
   | "audit"
   | "divorce"
   | "lawsuit";
+export type TutorialTopic =
+  | "intro"
+  | "portfolio"
+  | "debt"
+  | "space"
+  | "event"
+  | "space-opportunity"
+  | "space-market"
+  | "space-life"
+  | "space-payday"
+  | "space-special"
+  | "asset-1"
+  | "asset-2"
+  | "asset-3";
 export interface GameConfig {
   opponents: number;
   profession: string;
@@ -35,14 +49,18 @@ export interface GameConfig {
   liquidityRisk: boolean;
   principalRate: number;
   economicCycles: boolean;
+  /** Show the click-through guide for new and first-time game systems. */
+  tutorials: boolean;
 }
 export interface Debt {
+  /** Fixed monthly rate for new loans; absent on grandfathered annual-rate loans. */
+  monthlyRateBps?: number;
   paymentBasis?: { principal: Money; payment: Money };
   id: string;
   name: string;
   principal: Money;
   payment: Money;
-  kind: "home" | "school" | "car" | "credit" | "retail" | "bank";
+  kind: "home" | "school" | "car" | "credit" | "retail" | "bank" | "purchase";
 }
 export interface Profession {
   difficulty: RoleDifficulty;
@@ -64,6 +82,15 @@ export interface Profession {
   description: string;
 }
 export interface Asset {
+  listing?: {
+    listedRound: number;
+    closesRound: number;
+    /** Agreed gross proceeds, after the quick-sale discount, locked at listing. */
+    gross: Money;
+    discountBps: number;
+  };
+  boughtRound?: number;
+  acquisitionFee?: Money;
   referenceValue?: Money;
   financingBasis?: { principal: Money; payment: Money };
   id: string;
@@ -80,6 +107,11 @@ export interface Asset {
   distress: Money;
 }
 export interface Player {
+  /** Lifetime financed Type 1 acquisitions. Selling does not reset the tier. */
+  type1Purchases?: number;
+  /** Legacy catalog-purchase markers retained when loading older saves. */
+  bargainBuys?: Partial<Record<AssetCategory, number>>;
+  stockGains?: Money;
   elimination?: { round: number; reason: string; financials: Financials };
   id: string;
   name: string;
@@ -184,6 +216,7 @@ export interface AccountingSubmission {
   [field: string]: string;
 }
 export interface PendingAccounting {
+  completeDiscount?: true;
   next: Player;
   receipt: Receipt;
   fields: AccountingField[];
@@ -199,6 +232,13 @@ export type Decision =
       transferred: boolean;
     }
   | { kind: "market"; card: string; responder: number; remaining: number[] }
+  | {
+      kind: "discount";
+      card: string;
+      market: string;
+      responder: number;
+      remaining: number[];
+    }
   | { kind: "charity" }
   | { kind: "dream"; id: string }
   | { kind: "insolvency"; amount: Money; title: string; principal?: boolean }
@@ -211,6 +251,7 @@ export interface GameEvent {
   tone: "neutral" | "positive" | "negative";
 }
 export interface GameState {
+  marketState?: PersistentMarkets;
   personalReviewSeen: boolean;
   smallDeckStage: "early" | "normal";
   roleRevealed: boolean;
@@ -245,15 +286,28 @@ export interface GameState {
   winners: string[];
   finishReason: string;
   tutorialDone: boolean;
+  /** Contextual tutorial keys already completed in this match. */
+  tutorialSeen: string[];
+  /** Pending first-encounter lessons, in trigger order, retained across refresh. */
+  tutorialQueue: TutorialTopic[];
 }
 export type GameAction =
+  | { type: "SELL_ANYTIME"; playerId: string; assetId: string }
+  | { type: "CANCEL_SALE"; playerId: string; assetId: string }
+  | {
+      type: "BARGAIN_BUY";
+      card: string;
+      shares?: number;
+      outright?: boolean;
+      loan?: Money;
+    }
   | { type: "CLEAR_NOTIFICATIONS" }
   | { type: "ACKNOWLEDGE_GAME_OVER" }
   | { type: "REVEAL_ROLE" }
   | { type: "ACKNOWLEDGE"; id: number }
   | { type: "ROLL"; dice?: number }
   | { type: "DRAW"; tier: "small" | "large" }
-  | { type: "BUY"; shares?: number }
+  | { type: "BUY"; shares?: number; outright?: boolean; loan?: Money }
   | { type: "PASS" }
   | { type: "SELL"; assetId: string }
   | { type: "TRANSFER"; target: number; price: Money }
@@ -267,8 +321,21 @@ export type GameAction =
   | { type: "DRAFT"; field: AccountingField; value: string }
   | { type: "MODE"; accounting: "auto" | "manual" }
   | { type: "SPEED"; speed: GameConfig["speed"] }
-  | { type: "TUTORIAL" };
+  | { type: "TUTORIAL"; key?: string }
+  | { type: "TUTORIAL_MODE"; enabled: boolean };
 export interface NpcDecisionView {
+  lending?: {
+    service: Money;
+    income: Money;
+    bankRate: number;
+    purchaseRate: number;
+  };
+  voluntarySales?: Record<string, SaleQuote>;
+  assetIncomes?: Record<string, Money>;
+  canBorrow?: boolean;
+  modern?: boolean;
+  round?: number;
+  sales?: Record<string, SaleQuote>;
   player: Player;
   financials: Financials;
   phase: GameState["phase"];
@@ -289,6 +356,63 @@ export interface NpcDecisionView {
   liquidityReserve: Money;
   principalDue: Money;
   distressValues: Record<string, Money>;
+}
+export type AssetCategory = Asset["category"];
+export interface MarketTick {
+  id: number;
+  round: number;
+  category: AssetCategory;
+  before: number;
+  after: number;
+  card: string;
+  title: string;
+  player: string;
+  source?: "shock" | "drift" | "trend";
+  changeBps?: number;
+  trendStart?: number;
+  model?: 2;
+  fluctuationBps?: number;
+  cycleDrawBps?: number;
+  depression?: MarketDepression;
+}
+export interface MarketDepression {
+  start: number;
+  expires: number;
+}
+export interface MarketTrend {
+  id: string;
+  name: string;
+  description: string;
+  scenario: string;
+  source: { label: string; url: string };
+  tone: "positive" | "negative";
+  duration: number;
+  rates: Partial<Record<AssetCategory, [number, number]>>;
+}
+export interface MarketDynamics {
+  model?: 2;
+  depressions?: Partial<Record<AssetCategory, MarketDepression>>;
+  version: 1;
+  startedRound: number;
+  lastRound: number;
+  roundOpen: Record<AssetCategory, number>;
+  deck: string[];
+  active: { card: string; start: number; expires: number } | null;
+}
+export interface PersistentMarkets {
+  version: 1;
+  indices: Record<AssetCategory, number>;
+  history: MarketTick[];
+  dynamics?: MarketDynamics;
+}
+export interface SaleQuote {
+  gross: Money;
+  fee: Money;
+  penalty: Money;
+  taxableProfit: Money;
+  tax: Money;
+  mortgage: Money;
+  net: Money;
 }
 export interface FinancialHistoryPoint {
   id: number;

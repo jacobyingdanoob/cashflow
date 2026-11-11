@@ -84,20 +84,15 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   padding: 3px;
   pointer-events: none;
 }
 .notification-stack > * {
   pointer-events: auto;
 }
-.notification-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
+.notification-history {
+  position: relative;
   border: 1px solid #cbdcc8;
   border-radius: 9px;
   background: #fffff8;
@@ -105,28 +100,21 @@
   box-shadow: 0 3px 16px #183b2b12;
   font-size: 11px;
 }
-.notification-controls label {
+.notification-stack-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
+  padding: 8px 80px 8px 12px;
 }
-.notification-controls input {
-  accent-color: #24675b;
-}
-.notification-controls button {
+.notification-clear {
+  position: absolute;
+  top: 4px;
+  right: 9px;
   background: none;
   border: 0;
   color: #315e46;
   text-decoration: underline;
   padding: 4px;
-}
-.notification-empty {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 9px;
-  background: #fffff8;
-  color: #315e46;
   font-size: 11px;
 }
 .notification-live {
@@ -141,8 +129,8 @@
   background: #fffff8;
   border: 1px solid #cbdcc8;
   border-left: 4px solid #357768;
-  border-radius: 12px;
-  box-shadow: 0 8px 35px #183b2b29;
+  border-radius: 7px;
+  box-shadow: 0 3px 12px #183b2b18;
   flex-shrink: 0;
   animation: notification-arrive 0.22s ease-out;
 }
@@ -152,7 +140,7 @@
   text-align: left;
   border: 0;
   background: none;
-  padding: 15px 43px 15px 16px;
+  padding: 8px 38px 8px 12px;
   color: #315e46;
   border-radius: 10px;
 }
@@ -163,25 +151,25 @@
   font-size: 9px;
   letter-spacing: 0.6px;
   color: #526c4b;
-  margin-bottom: 9px;
+  margin-bottom: 3px;
 }
 .notification-meta > svg:last-child {
   margin-left: auto;
 }
 .notification-expand > strong {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.4;
   display: block;
 }
 .notification-preview {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 11px;
-  line-height: 1.75;
+  line-height: 1.4;
   color: #526b4b;
-  margin: 5px 0;
+  margin: 3px 0 0;
 }
 .notification-expand > small {
   display: block;
@@ -213,15 +201,15 @@
   background: #f7faed;
 }
 .older-notifications {
-  background: #f9fcf4;
-  border: 1px solid #d6e1cd;
-  border-radius: 9px;
-  padding: 9px 13px;
   font-size: 11px;
   color: #4b6841;
 }
 .older-notifications summary {
   cursor: pointer;
+  padding: 8px 80px 8px 12px;
+}
+.notification-history-list {
+  padding: 0 13px;
 }
 .older-notifications button {
   display: block;
@@ -553,7 +541,7 @@
     width: 330px;
   }
   .notification-expand {
-    padding: 12px 40px 12px 13px;
+    padding: 8px 38px 8px 12px;
   }
   .notification-preview {
     -webkit-line-clamp: 1;

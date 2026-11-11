@@ -13,6 +13,7 @@ import {
   encyclopediaMarkets,
   encyclopediaExpenses,
 } from "./encyclopedia";
+import { allModernMarkets } from "./market";
 export const dollars = (n: number) => Math.round(n * 100);
 export const EARLY_OPPORTUNITY_ROUNDS = 10;
 export const EARLY_OPPORTUNITY_WEIGHT = 3;
@@ -260,6 +261,8 @@ export const markets: MarketCard[] = [
   })),
   ...encyclopediaMarkets,
 ];
+export const marketById = (id: string) =>
+  allModernMarkets.find((c) => c.id === id) ?? markets.find((c) => c.id === id);
 const expenseData: [string, number, string][] = [
   ["A leaky roof", 850, "A repair today keeps a bigger problem away."],
   ["Car trouble", 620, "Your car needs an unexpected visit to the mechanic."],
@@ -360,6 +363,13 @@ export const dreams: Dream[] = [
     90000,
     "coffee",
   ],
+  [
+    "research",
+    "A neighborhood science lab",
+    "Fund a place for the next generation to discover.",
+    150000,
+    "science",
+  ],
 ].map(([id, name, description, cost, icon]) => ({
   id: String(id),
   name: String(name),
@@ -436,14 +446,20 @@ outerBoard[31] = { kind: "opportunity", label: "Opportunity" };
 // Include eliminated seats so players never move when someone leaves the game.
 export function fastTrackBoard(players: Pick<Player, "dream">[]): Space[] {
   const selected = [...new Set(players.map((p) => p.dream))],
-    slots = outerBoard.flatMap((s, i) => (s.kind === "dream" ? [i] : [])),
+    board =
+      selected.length > 8
+        ? outerBoard.map((s, i) =>
+            i === 31 ? { kind: "dream" as const, label: "Dream" } : s,
+          )
+        : outerBoard,
+    slots = board.flatMap((s, i) => (s.kind === "dream" ? [i] : [])),
     placed = new Map(
       selected.map((id, i) => [
         slots[Math.floor((i * slots.length) / selected.length)],
         dreams.find((d) => d.id === id)!,
       ]),
     );
-  return outerBoard.map((space, i) => {
+  return board.map((space, i) => {
     if (space.kind !== "dream") return space;
     const dream = placed.get(i);
     return dream
@@ -455,7 +471,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   liquidityRisk: true,
   principalRate: 0,
   economicCycles: true,
-  opponents: 3,
+  tutorials: true,
+  opponents: 4,
   profession: "random",
   roleDifficulty: "standard",
   adaptedCards: false,
@@ -473,8 +490,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   dream: "coast",
 };
 export const profileNames = {
-  cautious: "The careful planner",
-  income: "The income builder",
-  bold: "The calculated risk-taker",
-  diverse: "The balanced investor",
+  cautious: "Conservative saver",
+  income: "Speculator / day trader",
+  bold: "Aggressive leverager",
+  diverse: "Balanced investor",
 };

@@ -1,7 +1,7 @@
 {
   "name": "cashflow-playtest",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A local financial strategy board game.",
   "author": "jacobyingdanoob",
   "main": "desktop/main.cjs",
