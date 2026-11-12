@@ -1,8 +1,9 @@
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
-$bitmap = [System.Drawing.Bitmap]::new(256, 256)
+$bitmap = [System.Drawing.Bitmap]::new(1024, 1024)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+$graphics.ScaleTransform(4, 4)
 $background = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#154b43'))
 $gold = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#f1bf77'))
 $white = [System.Drawing.Pen]::new([System.Drawing.ColorTranslator]::FromHtml('#fffaf0'), 15)
@@ -28,6 +29,7 @@ $graphics.DrawLines($white, [System.Drawing.PointF[]]@(
   [System.Drawing.PointF]::new(195, 83)
 ))
 $graphics.Dispose()
+$bitmap.Save((Join-Path $PSScriptRoot 'icon.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $sizes = @(16, 24, 32, 48, 64, 128, 256)
 $images = foreach ($size in $sizes) {
   $scaled = [System.Drawing.Bitmap]::new($size, $size)

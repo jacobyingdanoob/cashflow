@@ -2,28 +2,33 @@
 
 A complete local browser playtest inspired by the CASHFLOW board-game mechanics. The city illustration, board, professions, and dreams are original. Original cards can optionally be joined by a sourced adaptation of the [Cash Flow Lifestyle encyclopedia](https://cashflow.lifestyle/encyclopedia/). Built with React, TypeScript, Vite, and SVG, with no backend, accounts, AI API, or paid services. Fonts are bundled locally.
 
-## What's new in 1.1.0
+## What's new in 1.2.0
 
-- **Living markets:** stock, property and business charts, round-by-round price changes, economic trends, market shocks, shared discount offers and depressions.
-- **More ways to trade:** sell stocks anytime, list property and businesses for later closing, and preview fees, taxes and financing before committing.
-- **Updated lending:** 2% monthly bank loans, 1% Type 1 purchase loans, rising down-payment tiers and a 55% debt-to-income limit for new borrowing in new games.
-- **Larger, fairer tables:** one to eight NPCs with distinct investing personalities, equal starting finances and individual dreams.
-- **Clearer guidance and records:** first-encounter tutorials, a rulebook, complete paginated transaction history, read-only player inspection and risk-focused end-game coaching.
-- **Web and Windows together:** both downloads contain the same v1.1.0 game. Existing saves remain supported; legacy matches retain their earlier market rules.
+- **Cashflow on Mac:** a universal application for Apple Silicon and Intel, with native app menus and local saves.
+- **A welcome on first launch:** learn the goal of Cashflow and this edition's moving markets, trading and borrowing rules, NPCs, accounting tools and reviews. The introduction appears once per profile and can be reopened from **How to play → About Cashflow & this edition**.
+- **The same game across platforms:** Mac, Windows x86 and browser downloads share the introduction and existing game rules. Saved matches remain supported.
 
-See the [v1.1.0 release notes](docs/releases/v1.1.0.md) for the changes and upgrade details.
+See the [v1.2.0 release notes](docs/releases/v1.2.0.md). The markets, trading, lending and tutorial additions are described in the [v1.1.0 notes](docs/releases/v1.1.0.md).
 
 ## Browser version
 
-Download [Cashflow-1.1.0-web.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.1.0/Cashflow-1.1.0-web.zip), extract it and serve the extracted folder through a local HTTP server or a static web host. The archive includes the built game, bundled fonts, a launch guide and a dependency-free Node.js server. Run `node serve.cjs` in that folder, then open `http://127.0.0.1:4173`. Keep the same browser, host and port to retain access to existing browser saves.
+Download [Cashflow-1.2.0-web.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-web.zip), extract it and serve the extracted folder through a local HTTP server or a static web host. The archive includes the built game, bundled fonts, a launch guide and a dependency-free Node.js server. Run `node serve.cjs` in that folder, then open `http://127.0.0.1:4173`. Keep the same browser, host and port to retain access to existing browser saves.
 
 See the [browser guide](docs/web.md) for setup, hosting and save behavior, or [Web development](#web-development) to run from source. This repository does not currently publish a GitHub Pages site.
 
+## Mac desktop app
+
+Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-macos-universal.zip), extract it and move **Cashflow.app** to **Applications**. The universal app supports Apple Silicon and Intel, includes the runtime and fonts, and plays offline. Saves live in `~/Library/Application Support/Cashflow`.
+
+The app is ad-hoc signed, without an Apple Developer ID signature or notarization, so macOS may require approval to open it. See the [Mac guide](docs/macos.md) for opening, saves and download verification.
+
+To build and test on a Mac, run `npm ci`, `npm run desktop:build:mac` and `npm run desktop:smoke:mac`. The smoke test extracts the actual download, verifies both architectures and the signature, plays a turn offline and checks save restoration. The GitHub Actions workflow runs these checks before uploading the Mac archive.
+
 ## Windows desktop app (x86)
 
-Download [Cashflow-1.1.0-windows-x86.exe](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.1.0/Cashflow-1.1.0-windows-x86.exe) and double-click it. This is a portable 32-bit app for Windows 10 or later, including 64-bit Windows. It includes the game and its runtime, works offline, and requires no installation, Node.js, administrator access, or separate browser.
+Download [Cashflow-1.2.0-windows-x86.exe](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-windows-x86.exe) and double-click it. This is a portable 32-bit app for Windows 10 or later, including 64-bit Windows. It includes the game and its runtime, works offline, and requires no installation, Node.js, administrator access, or separate browser.
 
-Each launch extracts the bundled runtime into a temporary folder. Saves remain in `%APPDATA%\Cashflow` when the app closes, moves, or updates. To upgrade from v1.0.0, close the old app and open the new executable; both use the same save folder. The desktop app has its own saves, separate from browser saves. The executable is unsigned. See the [Windows x86 guide](docs/windows-x86.md) for upgrade and verification details.
+Each launch extracts the bundled runtime into a temporary folder. Saves remain in `%APPDATA%\Cashflow` when the app closes, moves, or updates. To upgrade, close the old app and open the new executable; both use the same save folder. The desktop app has its own saves, separate from browser saves. The executable is unsigned. See the [Windows x86 guide](docs/windows-x86.md) for upgrade and verification details.
 
 To build the same Windows executable from source:
 
@@ -169,9 +174,9 @@ Anytime-sale regressions additionally cover delayed and immediate closings, lock
 - `src/components/`: illustrated SVG city/board, decisions, accounting worksheet, statements, setup, and accessible dialogs.
 - `src/App.tsx`: game orchestration, browser persistence, NPC scheduling, and preferences.
 - `tests/`: Playwright browser tests. Game tests sit beside the rules engine.
-- `desktop/`: Windows wrapper, icon and portable executable smoke test.
+- `desktop/`: desktop wrapper, icons and packaged Windows/Mac smoke tests.
 - `web/` and `scripts/package-web.ps1`: local server and web-release packaging.
-- `docs/`: browser and Windows guides, upgrade notes and release summaries.
+- `docs/`: browser, Windows and Mac guides, upgrade notes and release summaries.
 
 The project does not include online multiplayer, cloud saves, live economic feeds, or conversational NPC services. Balance values live in the content module so later playtesting can tune them without changing the financial engine.
 

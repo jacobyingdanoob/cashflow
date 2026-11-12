@@ -106,6 +106,14 @@ try {
   run = await launch(previousExecutable || executable);
   const { page } = run;
   page.on("pageerror", (error) => errors.push(error.message));
+  if (!previousExecutable) {
+    await expect(
+      page.getByRole("dialog", { name: "Welcome to Cashflow" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Get started", exact: true })
+      .click();
+  }
   await expect(
     page.getByRole("button", { name: "Start my story" }),
   ).toBeVisible();
@@ -136,6 +144,18 @@ try {
   await close(run);
   run = await launch();
   run.page.on("pageerror", (error) => errors.push(error.message));
+  if (previousExecutable) {
+    await expect(
+      run.page.getByRole("dialog", { name: "Welcome to Cashflow" }),
+    ).toBeVisible();
+    await run.page
+      .getByRole("button", { name: "Get started", exact: true })
+      .click();
+  } else {
+    await expect(
+      run.page.getByRole("dialog", { name: "Welcome to Cashflow" }),
+    ).toHaveCount(0);
+  }
   await expect(
     run.page.getByRole("group", { name: /Game board/ }),
   ).toBeVisible();

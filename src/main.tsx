@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./market.css";
+import "./welcome.css";
 import App from "./App";
 import "./styles.css";
 import "./accessibility.css";

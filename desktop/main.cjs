@@ -13,7 +13,7 @@ protocol.registerSchemesAsPrivileged([
 
 // Keep the same save directory and origin when the portable EXE is moved or updated.
 app.setName("Cashflow");
-app.setAppUserModelId("com.cashflow.game");
+if (process.platform === "win32") app.setAppUserModelId("com.cashflow.game");
 const saveDirectory =
   app.commandLine.getSwitchValue("user-data-dir") ||
   path.join(app.getPath("appData"), "Cashflow");
@@ -111,7 +111,15 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     protocol.handle("cashflow", serveGame);
-    Menu.setApplicationMenu(null);
+    Menu.setApplicationMenu(
+      process.platform === "darwin"
+        ? Menu.buildFromTemplate([
+            { role: "appMenu" },
+            { role: "editMenu" },
+            { role: "windowMenu" },
+          ])
+        : null,
+    );
     createWindow();
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

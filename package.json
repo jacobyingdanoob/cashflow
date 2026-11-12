@@ -1,7 +1,7 @@
 {
   "name": "cashflow-playtest",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A local financial strategy board game.",
   "author": "jacobyingdanoob",
   "main": "desktop/main.cjs",
@@ -14,7 +14,9 @@
     "test:browser": "playwright test",
     "desktop": "npm run build && electron .",
     "desktop:build": "npm run build && electron-builder --win portable --ia32 --publish never",
-    "desktop:smoke": "node desktop/smoke.mjs"
+    "desktop:smoke": "node desktop/smoke.mjs",
+    "desktop:build:mac": "npm run build && electron-builder --mac zip --universal --publish never",
+    "desktop:smoke:mac": "node desktop/mac-smoke.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",

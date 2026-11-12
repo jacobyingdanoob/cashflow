@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import AxeBuilder from "@axe-core/playwright";
 import { createGame, reduceGame, preciseMoney } from "../src/game/engine";
 import { innerBoard } from "../src/game/content";

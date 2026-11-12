@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import AxeBuilder from "@axe-core/playwright";
 import { createGame, playerFinancials, preciseMoney } from "../src/game/engine";
 import { smallDeals } from "../src/game/content";

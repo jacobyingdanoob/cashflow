@@ -11,6 +11,17 @@ files:
   - desktop/icon.ico
   - package.json
   - "!node_modules/**/*"
+mac:
+  target:
+    - target: zip
+      arch:
+        - universal
+  artifactName: Cashflow-${version}-macos-${arch}.${ext}
+  category: public.app-category.board-games
+  icon: desktop/icon.png
+  identity: "-"
+  hardenedRuntime: false
+  notarize: false
 win:
   target:
     - target: portable

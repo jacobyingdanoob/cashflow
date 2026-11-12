@@ -1,4 +1,5 @@
 import RoleReveal from "./components/RoleReveal";
+import Welcome from "./components/Welcome";
 import Market, { MarketChanges } from "./components/Market";
 import { TrendBadge } from "./components/MarketTrend";
 import {
@@ -98,6 +99,13 @@ function getPrefs() {
     return JSON.parse(localStorage.getItem("cashflow.preferences") ?? "{}");
   } catch {
     return {};
+  }
+}
+function needsWelcome() {
+  try {
+    return localStorage.getItem("cashflow.welcome.v1") !== "seen";
+  } catch {
+    return true;
   }
 }
 function SavePanel({
@@ -391,6 +399,7 @@ export default function App() {
   const [initial] = useState(boot),
     [game, setGame] = useState(initial.state),
     [recovery, setRecovery] = useState(initial.error),
+    [welcomeOpen, setWelcomeOpen] = useState(needsWelcome),
     [panel, setPanel] = useState<Panel>(null),
     [toast, setToast] = useState(""),
     [paused, setPaused] = useState(false),
@@ -408,12 +417,13 @@ export default function App() {
   const shownResults = useRef(false);
   const [activeNotice, setActiveNotice] = useState<ActivityNotice | null>(null);
   const tutorial: TutorialTopic | null =
-    game.config.tutorials && game.roleRevealed
+    !welcomeOpen && game.config.tutorials && game.roleRevealed
       ? !game.tutorialSeen.includes("intro")
         ? "intro"
         : (requestedTutorial ?? game.tutorialQueue?.[0] ?? null)
       : null;
-  const showRole = !game.roleRevealed && !panel && !recovery && !activeNotice;
+  const showRole =
+    !welcomeOpen && !game.roleRevealed && !panel && !recovery && !activeNotice;
   const human = game.players[0],
     f = playerFinancials(game, human),
     actor = actingPlayer(game),
@@ -422,12 +432,14 @@ export default function App() {
   const showDiscount =
     game.decision?.kind === "discount" &&
     actor.human &&
+    !welcomeOpen &&
     !panel &&
     !activeNotice &&
     !tutorial &&
     !showRole &&
     !recovery;
   const overlayOpen = !!(
+    welcomeOpen ||
     activeNotice ||
     panel ||
     showRole ||
@@ -435,6 +447,14 @@ export default function App() {
     tutorial
   );
   const notify = useCallback((message: string) => setToast(message), []);
+  const finishWelcome = useCallback(() => {
+    try {
+      localStorage.setItem("cashflow.welcome.v1", "seen");
+    } catch {
+      // The introduction can still be closed when storage is unavailable.
+    }
+    setWelcomeOpen(false);
+  }, []);
   const keepDiscountOpen = useCallback(() => {}, []);
   const revealTutorialTarget = useCallback((selector: string) => {
     if (selector === ".game-board") setMobileTab("board");
@@ -543,6 +563,7 @@ export default function App() {
       (panel && panel !== "gameover") ||
       paused ||
       recovery ||
+      welcomeOpen ||
       tutorial
     )
       return;
@@ -574,8 +595,18 @@ export default function App() {
       clearTimeout(id);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [game, actor.human, panel, paused, recovery, notify, tutorial]);
+  }, [
+    game,
+    actor.human,
+    panel,
+    paused,
+    recovery,
+    notify,
+    tutorial,
+    welcomeOpen,
+  ]);
   useEffect(() => {
+    if (welcomeOpen) return;
     if (game.phase !== "finished") {
       shownResults.current = false;
       if (
@@ -602,6 +633,7 @@ export default function App() {
     game.pending,
     recovery,
     panel,
+    welcomeOpen,
   ]);
   const latest = game.receipts.find((r) => r.player === human.id);
   return (
@@ -1264,7 +1296,18 @@ export default function App() {
           ) : panel === "economy" ? (
             <EconomicEvents game={game} />
           ) : panel === "help" ? (
-            <Help />
+            <>
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setPanel(null);
+                  setWelcomeOpen(true);
+                }}
+              >
+                <BookOpen size={17} /> About Cashflow & this edition
+              </button>
+              <Help />
+            </>
           ) : (
             <div className="settings-content">
               <p className="muted">
@@ -1476,7 +1519,13 @@ export default function App() {
         />
       )}
       <div
-        inert={showRole || !!activeNotice || showDiscount || !!tutorial}
+        inert={
+          welcomeOpen ||
+          showRole ||
+          !!activeNotice ||
+          showDiscount ||
+          !!tutorial
+        }
         style={showDiscount ? { visibility: "hidden" } : undefined}
       >
         <Notifications
@@ -1503,6 +1552,7 @@ export default function App() {
           </button>
         </div>
       )}
+      {welcomeOpen && <Welcome onContinue={finishWelcome} />}
     </>
   );
 }
