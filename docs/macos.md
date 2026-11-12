@@ -1,6 +1,6 @@
 # Cashflow 1.2.0 — Mac guide
 
-Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-macos-universal.zip) from the [v1.2.0 release](https://github.com/jacobyingdanoob/cashflow/releases/tag/v1.2.0). The universal application contains both Apple Silicon and Intel binaries.
+Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-macos-universal.zip) from the [v1.2.0 release](https://github.com/jacobyingdanoob/cashflow/releases/tag/v1.2.0). The universal application contains both Apple Silicon and Intel binaries and requires macOS 12 or later.
 
 ## Install and open
 
@@ -8,7 +8,7 @@ Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob
 2. Move **Cashflow.app** into **Applications**.
 3. Open Cashflow. It includes the game, runtime and fonts, and plays offline without Node.js or a separate browser.
 
-The application has an ad-hoc signature for local execution. It is not signed with an Apple Developer ID or notarized, so macOS may require you to review and approve opening it. The release includes `SHA256SUMS-macos.txt` to verify the download with `shasum -a 256 Cashflow-1.2.0-macos-universal.zip`.
+The application has an ad-hoc signature for local execution. It is not signed with an Apple Developer ID or notarized, so macOS may require you to review and approve opening it. After attempting to open it, go to **System Settings → Privacy & Security → Open Anyway** if macOS blocks it, then confirm opening Cashflow. On older macOS versions, this control is in **System Preferences → Security & Privacy**. The release includes `SHA256SUMS-macos.txt` to verify the download with `shasum -a 256 Cashflow-1.2.0-macos-universal.zip`.
 
 On first launch, **Welcome to Cashflow** explains the goal and this edition's adaptations. Choose **Get started** to continue to your role and optional tutorials. It appears once per local profile; reopen it from **How to play → About Cashflow & this edition**. Reading the introduction pauses play and does not reset a saved match.
 
@@ -29,3 +29,5 @@ npm run desktop:smoke:mac
 ```
 
 The build creates `release/Cashflow-1.2.0-macos-universal.zip`. The Mac smoke test extracts that actual archive, checks both binary architectures and the signature, launches the application with a disposable save profile, verifies the first-launch introduction, plays a turn offline, and reopens the saved game. It also loads Market, Wiki and Rulebook. The GitHub Actions workflow repeats these steps on a hosted Mac before attaching the download to a draft release.
+
+For v1.2.0, [native verification passed on an Apple Silicon runner running macOS 26.7.2](https://github.com/jacobyingdanoob/cashflow/actions/runs/43181555641). The Intel architecture and ad-hoc signature were verified in the extracted universal app; gameplay was exercised on Apple Silicon. The bundle's declared minimum system version is macOS 12.0.

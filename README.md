@@ -18,7 +18,7 @@ See the [browser guide](docs/web.md) for setup, hosting and save behavior, or [W
 
 ## Mac desktop app
 
-Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-macos-universal.zip), extract it and move **Cashflow.app** to **Applications**. The universal app supports Apple Silicon and Intel, includes the runtime and fonts, and plays offline. Saves live in `~/Library/Application Support/Cashflow`.
+Download [Cashflow-1.2.0-macos-universal.zip](https://github.com/jacobyingdanoob/cashflow/releases/download/v1.2.0/Cashflow-1.2.0-macos-universal.zip), extract it and move **Cashflow.app** to **Applications**. The universal app supports Apple Silicon and Intel on macOS 12 or later, includes the runtime and fonts, and plays offline. Saves live in `~/Library/Application Support/Cashflow`.
 
 The app is ad-hoc signed, without an Apple Developer ID signature or notarization, so macOS may require approval to open it. See the [Mac guide](docs/macos.md) for opening, saves and download verification.
 
